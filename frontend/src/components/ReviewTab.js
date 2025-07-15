@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Drawer, IconButton } from '@mui/material';
-import { Settings as SettingsIcon, Close as CloseIcon } from '@mui/icons-material';
+import { Close as CloseIcon } from '@mui/icons-material';
 import AnnotationCard from './AnnotationCard';
 import ReviewSettings from './ReviewSettings';
 import FocusView from './FocusView';
@@ -21,7 +21,11 @@ function ReviewTab() {
     resize_images: true,
     image_width: 400,
     image_height: 200,
-    focus_mode_autoplay: true
+    focus_mode_autoplay: true,
+    focus_resize_images: true,
+    focus_image_width: 1000,
+    focus_image_height: 400,
+    keyboard_shortcuts_enabled: true
   });
   const [availableClasses, setAvailableClasses] = useState([]);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -31,28 +35,101 @@ function ReviewTab() {
   const [rootAudioPath, setRootAudioPath] = useState('');
   const [isFocusMode, setIsFocusMode] = useState(false);
   const [focusClipIndex, setFocusClipIndex] = useState(0);
+  const [isLeftTrayOpen, setIsLeftTrayOpen] = useState(false);
+  const [filters, setFilters] = useState({
+    annotation: { enabled: false, values: [] },
+    labels: { enabled: false, values: [] },
+    annotation_status: { enabled: false, values: [] }
+  });
+  const [appliedFilters, setAppliedFilters] = useState({
+    annotation: { enabled: false, values: [] },
+    labels: { enabled: false, values: [] },
+    annotation_status: { enabled: false, values: [] }
+  });
+  const [autoSaveEnabled, setAutoSaveEnabled] = useState(true);
+  const [autoSaveLocation, setAutoSaveLocation] = useState('');
   const fileInputRef = useRef(null);
 
   // HTTP-based loader (fast and reliable)
   const httpLoader = useHttpAudioLoader('http://localhost:8000');
 
+  const handleSettingsChange = (newSettings) => {
+    setSettings(newSettings);
+
+    // If grid size changed, adjust current page to stay in bounds
+    const newItemsPerPage = newSettings.grid_rows * newSettings.grid_columns;
+    const newTotalPages = Math.ceil(annotationData.length / newItemsPerPage);
+    if (currentPage >= newTotalPages && newTotalPages > 0) {
+      setCurrentPage(newTotalPages - 1);
+    }
+
+    // Re-extract classes if review mode changed
+    if (newSettings.review_mode !== settings.review_mode) {
+      extractAvailableClasses(annotationData);
+    }
+  };
+
+  // Apply filters to annotation data (using appliedFilters, not filters)
+  const filteredAnnotationData = useMemo(() => {
+    return annotationData.filter(clip => {
+      // Filter by annotation (binary mode)
+      if (appliedFilters.annotation.enabled && appliedFilters.annotation.values.length > 0) {
+        const clipAnnotation = clip.annotation || 'unlabeled';
+        if (!appliedFilters.annotation.values.includes(clipAnnotation)) {
+          return false;
+        }
+      }
+
+      // Filter by labels (multi-class mode)
+      if (appliedFilters.labels.enabled && appliedFilters.labels.values.length > 0) {
+        const clipLabels = clip.labels || '';
+        if (!clipLabels) return false;
+
+        try {
+          let labels = [];
+          if (clipLabels.startsWith('[') && clipLabels.endsWith(']')) {
+            labels = JSON.parse(clipLabels.replace(/'/g, '"'));
+          } else {
+            labels = clipLabels.split(',').map(s => s.trim()).filter(s => s);
+          }
+
+          // Check if any of the clip's labels match the filter
+          const hasMatchingLabel = labels.some(label => appliedFilters.labels.values.includes(label));
+          if (!hasMatchingLabel) return false;
+        } catch (e) {
+          return false;
+        }
+      }
+
+      // Filter by annotation status (multi-class mode)
+      if (appliedFilters.annotation_status.enabled && appliedFilters.annotation_status.values.length > 0) {
+        const clipStatus = clip.annotation_status || 'unreviewed';
+        if (!appliedFilters.annotation_status.values.includes(clipStatus)) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [annotationData, appliedFilters]);
+
   // Calculate items per page based on grid settings
   const itemsPerPage = settings.grid_rows * settings.grid_columns;
-  const totalPages = Math.ceil(annotationData.length / itemsPerPage);
+  const totalPages = Math.ceil(filteredAnnotationData.length / itemsPerPage);
 
   // Get current page data - memoized to prevent unnecessary re-renders
   const getCurrentPageData = useCallback(() => {
     const start = currentPage * itemsPerPage;
     const end = start + itemsPerPage;
-    return annotationData.slice(start, end);
-  }, [currentPage, itemsPerPage, annotationData]);
+    return filteredAnnotationData.slice(start, end);
+  }, [currentPage, itemsPerPage, filteredAnnotationData]);
 
   // Memoize current page data separately to reduce dependencies
   const currentPageData = useMemo(() => {
     const start = currentPage * itemsPerPage;
     const end = start + itemsPerPage;
-    return annotationData.slice(start, end);
-  }, [currentPage, itemsPerPage, annotationData]);
+    return filteredAnnotationData.slice(start, end);
+  }, [currentPage, itemsPerPage, filteredAnnotationData]);
 
   // Load spectrograms for current page
   const loadCurrentPageSpectrograms = useCallback(async () => {
@@ -106,6 +183,16 @@ function ReviewTab() {
             resize_images: true,
             image_width: 400,
             image_height: 200,
+          };
+        }
+
+        // Override with focus mode settings if in focus mode
+        if (isFocusMode) {
+          visualizationSettings = {
+            ...visualizationSettings,
+            resize_images: settings.focus_resize_images,
+            image_width: settings.focus_image_width,
+            image_height: settings.focus_image_height,
           };
         }
 
@@ -175,14 +262,36 @@ function ReviewTab() {
   // Track when data actually changes (new file loaded) vs just annotations updated
   const dataVersion = useRef(0);
   const [currentDataVersion, setCurrentDataVersion] = useState(0);
-  
-  // Load spectrograms when page changes, new data loaded, or settings change
+
+  // Load spectrograms when page changes, new data loaded, settings change, or filtering changes
   useEffect(() => {
     if (annotationData.length > 0) {
       loadCurrentPageSpectrograms();
     }
-  }, [currentPage, currentDataVersion, rootAudioPath]);
-  
+  }, [currentPage, currentDataVersion, rootAudioPath, filteredAnnotationData.length, settings.grid_rows, settings.grid_columns]);
+
+  // Auto-save on page changes
+  useEffect(() => {
+    if (annotationData.length > 0 && currentPage > 0) { // Don't auto-save on initial load
+      performAutoSave();
+    }
+  }, [currentPage]);
+
+  // Auto-save on focus clip changes
+  useEffect(() => {
+    if (isFocusMode && annotationData.length > 0 && focusClipIndex > 0) { // Don't auto-save on initial load
+      performAutoSave();
+    }
+  }, [focusClipIndex]);
+
+  // Load auto-save location from localStorage on mount
+  useEffect(() => {
+    const savedLocation = localStorage.getItem('review_autosave_location');
+    if (savedLocation) {
+      setAutoSaveLocation(savedLocation);
+    }
+  }, []);
+
   // Separate effect to detect when NEW data is loaded (not just annotations changed)
   useEffect(() => {
     // Only increment version when the data array length changes (new file loaded)
@@ -256,7 +365,7 @@ function ReviewTab() {
         currentSettings = JSON.parse(savedSettings);
       }
 
-      if (!rootAudioPath) {
+      if (!rootAudioPath || rootAudioPath.trim() === '') {
         // Set root audio path to directory containing the CSV file
         const csvDirectory = filePath.substring(0, filePath.lastIndexOf('/'));
         setRootAudioPath(csvDirectory);
@@ -371,7 +480,7 @@ function ReviewTab() {
         .map(line => line.trim())
         .filter(line => line.length > 0);
       manualClasses.forEach(cls => classSet.add(cls));
-      
+
       // If manual classes are provided, only use those (don't extract from clips)
       // This ensures when user changes manual classes, old values don't persist
       if (manualClasses.length > 0) {
@@ -465,25 +574,222 @@ function ReviewTab() {
 
   // Focus mode annotation change
   const handleFocusAnnotationChange = useCallback((newAnnotation, newAnnotationStatus) => {
-    const currentClip = annotationData[focusClipIndex];
+    const currentClip = filteredAnnotationData[focusClipIndex];
     if (currentClip) {
       handleAnnotationChange(currentClip.id, newAnnotation, newAnnotationStatus);
     }
-  }, [focusClipIndex, annotationData, handleAnnotationChange]);
+  }, [focusClipIndex, filteredAnnotationData, handleAnnotationChange]);
+
+  // Focus mode comment change
+  const handleFocusCommentChange = useCallback((newComment) => {
+    const currentClip = filteredAnnotationData[focusClipIndex];
+    if (currentClip) {
+      handleCommentChange(currentClip.id, newComment);
+    }
+  }, [focusClipIndex, filteredAnnotationData, handleCommentChange]);
 
   // Reset focus index when data changes
   useEffect(() => {
-    if (annotationData.length > 0 && focusClipIndex >= annotationData.length) {
+    if (filteredAnnotationData.length > 0 && focusClipIndex >= filteredAnnotationData.length) {
       setFocusClipIndex(0);
     }
-  }, [annotationData.length, focusClipIndex]);
+  }, [filteredAnnotationData.length, focusClipIndex]);
+
+  // Get available filter options
+  const getFilterOptions = useMemo(() => {
+    const options = {
+      annotation: new Set(),
+      labels: new Set(),
+      annotation_status: new Set()
+    };
+
+    annotationData.forEach(clip => {
+      // Binary annotation options
+      const annotation = clip.annotation || 'unlabeled';
+      options.annotation.add(annotation);
+
+      // Multi-class label options
+      if (clip.labels) {
+        try {
+          let labels = [];
+          if (clip.labels.startsWith('[') && clip.labels.endsWith(']')) {
+            labels = JSON.parse(clip.labels.replace(/'/g, '"'));
+          } else {
+            labels = clip.labels.split(',').map(s => s.trim()).filter(s => s);
+          }
+          labels.forEach(label => options.labels.add(label));
+        } catch (e) {
+          // Ignore parsing errors
+        }
+      }
+
+      // Annotation status options
+      const status = clip.annotation_status || 'unreviewed';
+      options.annotation_status.add(status);
+    });
+
+    return {
+      annotation: Array.from(options.annotation).sort(),
+      labels: Array.from(options.labels).sort(),
+      annotation_status: Array.from(options.annotation_status).sort()
+    };
+  }, [annotationData]);
+
+  // Handle filter changes (just update the UI state, don't apply yet)
+  const handleFilterChange = useCallback((filterType, enabled, values) => {
+    setFilters(prev => ({
+      ...prev,
+      [filterType]: { enabled, values }
+    }));
+  }, []);
+
+  // Apply filters function
+  const applyFilters = useCallback(() => {
+    setAppliedFilters(filters);
+    setCurrentPage(0); // Reset to first page when filters are applied
+  }, [filters]);
+
+  // Clear filters function
+  const clearFilters = useCallback(() => {
+    const emptyFilters = {
+      annotation: { enabled: false, values: [] },
+      labels: { enabled: false, values: [] },
+      annotation_status: { enabled: false, values: [] }
+    };
+    setFilters(emptyFilters);
+    setAppliedFilters(emptyFilters);
+    setCurrentPage(0);
+  }, []);
+
+  // Check if filters have changed since last apply
+  const hasUnappliedFilterChanges = useMemo(() => {
+    return JSON.stringify(filters) !== JSON.stringify(appliedFilters);
+  }, [filters, appliedFilters]);
+
+  // Bulk annotation function for current page
+  const handleBulkAnnotation = useCallback((annotationValue) => {
+    const currentData = currentPageData;
+    if (currentData.length === 0) return;
+
+    // Update all clips on current page
+    setAnnotationData(prev => {
+      const newArray = [...prev];
+      currentData.forEach(clip => {
+        const clipIndex = newArray.findIndex(c => c.id === clip.id);
+        if (clipIndex !== -1) {
+          newArray[clipIndex] = {
+            ...newArray[clipIndex],
+            annotation: annotationValue === 'unlabeled' ? '' : annotationValue
+          };
+        }
+      });
+      return newArray;
+    });
+    setHasUnsavedChanges(true);
+  }, [currentPageData]);
+
+  // Keyboard shortcuts for grid view
+  useEffect(() => {
+    if (!settings.keyboard_shortcuts_enabled || isFocusMode) return;
+
+    const handleKeyDown = (event) => {
+      // Check if user is typing in a text field
+      const isTyping = (
+        event.target.tagName === "TEXTAREA" ||
+        (event.target.tagName === "INPUT" && event.target.type === "text") ||
+        (event.target.tagName === "INPUT" && event.target.type === "number")
+      );
+      
+      // Don't handle shortcuts if user is typing
+      if (isTyping) return;
+
+      const isMac = navigator.userAgent.includes('Mac') || navigator.userAgent.includes('macOS');
+      const cmdOrCtrl = isMac ? event.metaKey : event.ctrlKey;
+
+      // Handle Escape key for focus/grid toggle
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setIsFocusMode(prev => !prev);
+        return;
+      }
+
+      // Only handle other shortcuts if cmd/ctrl is pressed
+      if (!cmdOrCtrl) return;
+
+      // Prevent default behavior for our shortcuts
+      const shortcutKeys = ['a', 's', 'd', 'f', 'j', 'k', 'c'];
+      if (shortcutKeys.includes(event.key.toLowerCase())) {
+        event.preventDefault();
+      }
+
+      switch (event.key.toLowerCase()) {
+        case 'a':
+          if (event.shiftKey) {
+            // Cmd/Ctrl+Shift+A: bulk annotate as Yes
+            if (settings.review_mode === 'binary') {
+              handleBulkAnnotation('yes');
+            }
+          }
+          break;
+        case 's':
+          if (event.shiftKey) {
+            // Cmd/Ctrl+Shift+S: bulk annotate as No
+            if (settings.review_mode === 'binary') {
+              handleBulkAnnotation('no');
+            }
+          }
+          break;
+        case 'd':
+          if (event.shiftKey) {
+            // Cmd/Ctrl+Shift+D: bulk annotate as Unsure
+            if (settings.review_mode === 'binary') {
+              handleBulkAnnotation('unsure');
+            }
+          }
+          break;
+        case 'f':
+          if (event.shiftKey) {
+            // Cmd/Ctrl+Shift+F: bulk annotate as Unlabeled
+            if (settings.review_mode === 'binary') {
+              handleBulkAnnotation('unlabeled');
+            }
+          }
+          break;
+        case 'j':
+          // Cmd/Ctrl+J: previous page
+          if (currentPage > 0) {
+            setCurrentPage(prev => prev - 1);
+          }
+          break;
+        case 'k':
+          // Cmd/Ctrl+K: next page
+          if (currentPage < totalPages - 1) {
+            setCurrentPage(prev => prev + 1);
+          }
+          break;
+        case 'c':
+          if (event.shiftKey) {
+            // Cmd/Ctrl+Shift+C: toggle comments
+            handleSettingsChange({ ...settings, show_comments: !settings.show_comments });
+          }
+          break;
+        default:
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [settings, isFocusMode, currentPage, totalPages, handleBulkAnnotation, handleSettingsChange]);
 
   // Load current focus clip spectrogram when in focus mode
   useEffect(() => {
     if (isFocusMode && annotationData.length > 0) {
       const currentClip = annotationData[focusClipIndex];
       const hasLoadedData = loadedPageData.find(loaded => loaded.clip_id === currentClip?.id);
-      
+
       if (currentClip && !hasLoadedData) {
         // Load the current clip if it's not already loaded
         loadFocusClipSpectrogram(currentClip);
@@ -534,8 +840,16 @@ function ReviewTab() {
         };
       }
 
+      // Use focus mode settings for focus mode
+      visualizationSettings = {
+        ...visualizationSettings,
+        resize_images: settings.focus_resize_images,
+        image_width: settings.focus_image_width,
+        image_height: settings.focus_image_height,
+      };
+
       const loadedClip = await httpLoader.loadClipsBatch([clipToLoad], visualizationSettings);
-      
+
       if (loadedClip && loadedClip.length > 0) {
         setLoadedPageData(prev => {
           // Remove any existing data for this clip and add the new data
@@ -568,19 +882,50 @@ function ReviewTab() {
     }
   };
 
-  const handleSettingsChange = (newSettings) => {
-    setSettings(newSettings);
-
-    // If grid size changed, adjust current page to stay in bounds
-    const newItemsPerPage = newSettings.grid_rows * newSettings.grid_columns;
-    const newTotalPages = Math.ceil(annotationData.length / newItemsPerPage);
-    if (currentPage >= newTotalPages && newTotalPages > 0) {
-      setCurrentPage(newTotalPages - 1);
+  const handleSelectAutoSaveLocation = async () => {
+    try {
+      if (!window.electronAPI) {
+        alert('Auto-save location selection is only available in the desktop app');
+        return;
+      }
+      
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+      const defaultName = `annotations_${timestamp}.csv`;
+      const filePath = await window.electronAPI.saveFile(defaultName);
+      
+      if (filePath) {
+        setAutoSaveLocation(filePath);
+        // Save to localStorage
+        localStorage.setItem('review_autosave_location', filePath);
+      }
+    } catch (err) {
+      console.error('Failed to select auto-save location:', err);
     }
+  };
 
-    // Re-extract classes if review mode changed
-    if (newSettings.review_mode !== settings.review_mode) {
-      extractAvailableClasses(annotationData);
+  const performAutoSave = async () => {
+    if (!autoSaveEnabled || !hasUnsavedChanges) return;
+    
+    try {
+      let saveLocation = autoSaveLocation;
+      
+      // If no location set, prompt for one
+      if (!saveLocation) {
+        await handleSelectAutoSaveLocation();
+        saveLocation = autoSaveLocation;
+      }
+      
+      if (saveLocation) {
+        const csvContent = exportToCSV();
+        
+        if (window.electronAPI?.writeFile) {
+          await window.electronAPI.writeFile(saveLocation, csvContent);
+          setHasUnsavedChanges(false);
+          console.log('Auto-saved to:', saveLocation);
+        }
+      }
+    } catch (err) {
+      console.error('Auto-save failed:', err);
     }
   };
 
@@ -600,18 +945,24 @@ function ReviewTab() {
         return;
       }
 
+      const csvContent = exportToCSV();
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
       const defaultName = `annotations_${timestamp}.csv`;
-      const filePath = await window.electronAPI.saveFile(defaultName);
-
-      if (filePath) {
-        const csvContent = exportToCSV();
-        // For now, trigger download since writeFile doesn't exist
+      
+      // Check if writeFile is available for proper Electron file saving
+      if (window.electronAPI.writeFile) {
+        const filePath = await window.electronAPI.saveFile(defaultName);
+        if (filePath) {
+          await window.electronAPI.writeFile(filePath, csvContent);
+          setHasUnsavedChanges(false);
+        }
+      } else {
+        // Fallback: just trigger download without file dialog
         const blob = new Blob([csvContent], { type: 'text/csv' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = filePath.split('/').pop() || 'annotations.csv';
+        a.download = defaultName;
         a.click();
         URL.revokeObjectURL(url);
         setHasUnsavedChanges(false);
@@ -655,42 +1006,37 @@ function ReviewTab() {
     return `annotation-grid grid-${settings.grid_rows}x${settings.grid_columns}`;
   }, [settings.grid_rows, settings.grid_columns]);
 
-  const renderPagination = () => {
-    if (totalPages <= 1) return null;
+
+  const renderBulkAnnotationControls = () => {
+    if (settings.review_mode !== 'binary' || currentPageData.length === 0) return null;
+
+    const binaryOptions = [
+      { value: 'yes', label: 'Yes', color: 'rgb(145, 180, 135)' },
+      { value: 'no', label: 'No', color: 'rgb(207, 122, 107)' },
+      { value: 'unsure', label: 'Unsure', color: 'rgb(237, 223, 177)' },
+      { value: 'unlabeled', label: 'Unlabeled', color: 'rgb(223, 223, 223)' }
+    ];
 
     return (
-      <div className="pagination-container">
-        <button
-          className="pagination-button"
-          onClick={() => setCurrentPage(prev => Math.max(0, prev - 1))}
-          disabled={currentPage === 0}
-        >
-          Previous
-        </button>
-
-        <div className="pagination-info">
-          <span>Page</span>
-          <select 
-            value={currentPage + 1} 
-            onChange={(e) => setCurrentPage(parseInt(e.target.value) - 1)}
-            className="page-selector"
-          >
-            {Array.from({ length: totalPages }, (_, i) => (
-              <option key={i + 1} value={i + 1}>
-                {i + 1}
-              </option>
-            ))}
-          </select>
-          <span>of {totalPages} ({annotationData.length} clips total)</span>
+      <div className="bulk-annotation-controls">
+        <span className="bulk-annotation-label">Label all clips on this page:</span>
+        <div className="bulk-annotation-buttons">
+          {binaryOptions.map(option => (
+            <button
+              key={option.value}
+              className="bulk-annotation-button"
+              style={{
+                backgroundColor: option.color,
+                color: 'white',
+                border: `2px solid ${option.color}`
+              }}
+              onClick={() => handleBulkAnnotation(option.value)}
+              title={`Mark all ${currentPageData.length} clips on this page as ${option.label}`}
+            >
+              {option.label}
+            </button>
+          ))}
         </div>
-
-        <button
-          className="pagination-button"
-          onClick={() => setCurrentPage(prev => Math.min(totalPages - 1, prev + 1))}
-          disabled={currentPage === totalPages - 1}
-        >
-          Next
-        </button>
       </div>
     );
   };
@@ -735,7 +1081,7 @@ function ReviewTab() {
             );
           })}
         </div>
-        
+
         {/* Loading overlay that appears over existing content */}
         {showLoadingOverlay && (
           <div className="loading-overlay">
@@ -758,6 +1104,240 @@ function ReviewTab() {
 
   return (
     <div className="review-tab-layout">
+      {/* Left Tray */}
+      <Drawer
+        anchor="left"
+        open={isLeftTrayOpen}
+        onClose={() => setIsLeftTrayOpen(false)}
+        variant="temporary"
+        sx={{
+          '& .MuiDrawer-paper': {
+            width: 400,
+            boxSizing: 'border-box',
+            backgroundColor: '#ffffff',
+            fontFamily: 'Rokkitt, sans-serif',
+          },
+        }}
+      >
+        <div className="drawer-header">
+          <h3 style={{ margin: 0, fontFamily: 'Rokkitt, sans-serif', fontSize: '1.1rem', fontWeight: 600 }}>
+            Load & Filter
+          </h3>
+          <IconButton
+            onClick={() => setIsLeftTrayOpen(false)}
+            sx={{
+              color: '#6b7280',
+              '&:hover': { backgroundColor: '#f3f4f6' }
+            }}
+          >
+            <CloseIcon />
+          </IconButton>
+        </div>
+        <div className="drawer-content">
+          {/* Load Annotation Task Section */}
+          <div className="tray-section">
+            <h4>Load Annotation Task</h4>
+            <p>Load a CSV file with columns: file, start_time, end_time (optional), annotation, comments (optional)</p>
+
+            <div className="button-group">
+              <button onClick={handleLoadAnnotationTask} disabled={loading}>
+                {loading ? 'Loading...' : 'Load Annotation CSV'}
+              </button>
+              {selectedFile && (
+                <span className="selected-file">
+                  Loaded: {selectedFile.split('/').pop()}
+                </span>
+              )}
+              {annotationData.length > 0 && (
+                <button
+                  onClick={handleExportAnnotations}
+                  className="primary-button"
+                  disabled={!hasUnsavedChanges}
+                >
+                  {hasUnsavedChanges ? 'Export Annotations *' : 'Export Annotations'}
+                </button>
+              )}
+            </div>
+
+            {/* Root Audio Path Setting */}
+            <div className="audio-path-setting">
+              <label>
+                Root Audio Folder:
+                <div className="file-path-control">
+                  <input
+                    type="text"
+                    value={rootAudioPath}
+                    onChange={(e) => setRootAudioPath(e.target.value)}
+                    placeholder="Leave empty for absolute paths"
+                    className="path-input"
+                  />
+                  <button
+                    onClick={handleSelectRootAudioPath}
+                    className="select-folder-button"
+                    type="button"
+                  >
+                    Browse
+                  </button>
+                </div>
+              </label>
+              <div className="path-help-text">
+                <small>
+                  This folder is used as the base path for relative file paths in the CSV.
+                  If empty, file paths are expected to be absolute.
+                </small>
+              </div>
+            </div>
+
+            {error && (
+              <div className="error-message">
+                {error}
+              </div>
+            )}
+
+            {hasUnsavedChanges && (
+              <div className="unsaved-changes-notice">
+                <strong>⚠ Unsaved changes</strong> - Remember to export your annotations when finished.
+              </div>
+            )}
+          </div>
+
+          {/* Filtering Section */}
+          {annotationData.length > 0 && (
+            <div className="tray-section">
+              <h4>Filter Clips</h4>
+
+              {/* Binary mode: Filter by annotation */}
+              {settings.review_mode === 'binary' && (
+                <div className="filter-group">
+                  <label className="filter-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={filters.annotation.enabled}
+                      onChange={(e) => handleFilterChange('annotation', e.target.checked, filters.annotation.values)}
+                    />
+                    Filter by annotation
+                  </label>
+                  {filters.annotation.enabled && (
+                    <select
+                      multiple
+                      value={filters.annotation.values}
+                      onChange={(e) => {
+                        const values = Array.from(e.target.selectedOptions, option => option.value);
+                        handleFilterChange('annotation', true, values);
+                      }}
+                      className="filter-multiselect"
+                    >
+                      {getFilterOptions.annotation.map(option => (
+                        <option key={option} value={option}>
+                          {option === '' ? 'unlabeled' : option}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              )}
+
+              {/* Multi-class mode: Filter by labels and status */}
+              {settings.review_mode === 'multiclass' && (
+                <>
+                  <div className="filter-group">
+                    <label className="filter-checkbox">
+                      <input
+                        type="checkbox"
+                        checked={filters.labels.enabled}
+                        onChange={(e) => handleFilterChange('labels', e.target.checked, filters.labels.values)}
+                      />
+                      Filter by labels
+                    </label>
+                    {filters.labels.enabled && (
+                      <select
+                        multiple
+                        value={filters.labels.values}
+                        onChange={(e) => {
+                          const values = Array.from(e.target.selectedOptions, option => option.value);
+                          handleFilterChange('labels', true, values);
+                        }}
+                        className="filter-multiselect"
+                      >
+                        {getFilterOptions.labels.map(option => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+
+                  <div className="filter-group">
+                    <label className="filter-checkbox">
+                      <input
+                        type="checkbox"
+                        checked={filters.annotation_status.enabled}
+                        onChange={(e) => handleFilterChange('annotation_status', e.target.checked, filters.annotation_status.values)}
+                      />
+                      Filter by status
+                    </label>
+                    {filters.annotation_status.enabled && (
+                      <select
+                        multiple
+                        value={filters.annotation_status.values}
+                        onChange={(e) => {
+                          const values = Array.from(e.target.selectedOptions, option => option.value);
+                          handleFilterChange('annotation_status', true, values);
+                        }}
+                        className="filter-multiselect"
+                      >
+                        {getFilterOptions.annotation_status.map(option => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                </>
+              )}
+
+              {/* Filter Actions */}
+              <div className="filter-actions">
+                <button
+                  onClick={applyFilters}
+                  className="apply-filters-button"
+                  disabled={!hasUnappliedFilterChanges}
+                >
+                  Apply Filters
+                </button>
+                <button
+                  onClick={clearFilters}
+                  className="clear-filters-button"
+                >
+                  Clear All
+                </button>
+              </div>
+
+              {/* Show filter status */}
+              <div className="filter-status">
+                <small>
+                  Showing {filteredAnnotationData.length} of {annotationData.length} clips
+                  {hasUnappliedFilterChanges && (
+                    <span className="filter-pending"> (pending changes)</span>
+                  )}
+                </small>
+              </div>
+            </div>
+          )}
+
+          {/* File Input (hidden) */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv"
+            onChange={handleFileInputChange}
+            style={{ display: 'none' }}
+          />
+        </div>
+      </Drawer>
+
       {/* Settings Drawer */}
       <Drawer
         anchor="right"
@@ -777,9 +1357,9 @@ function ReviewTab() {
           <h3 style={{ margin: 0, fontFamily: 'Rokkitt, sans-serif', fontSize: '1.1rem', fontWeight: 600 }}>
             Review Settings
           </h3>
-          <IconButton 
+          <IconButton
             onClick={() => setIsSettingsPanelOpen(false)}
-            sx={{ 
+            sx={{
               color: '#6b7280',
               '&:hover': { backgroundColor: '#f3f4f6' }
             }}
@@ -790,8 +1370,8 @@ function ReviewTab() {
         <div className="drawer-content">
           {annotationData.length > 0 && (
             <>
-              <ReviewSettings 
-                onSettingsChange={handleSettingsChange} 
+              <ReviewSettings
+                onSettingsChange={handleSettingsChange}
                 onReRenderSpectrograms={loadCurrentPageSpectrograms}
                 onClearCache={httpLoader.clearCache}
               />
@@ -805,159 +1385,170 @@ function ReviewTab() {
         </div>
       </Drawer>
 
-      {/* Main Content Area */}
-      <div className="main-content-area">
-        <div className="main-content-header">
-          <h2>Review Annotations</h2>
-          {annotationData.length > 0 && (
-            <div className="header-controls">
-              {/* Focus Mode Toggle */}
-              <div className="focus-mode-toggle">
+      {/* Main Content Area - Full Window */}
+      <div className="review-main-content">
+        {/* Compact Top Toolbar */}
+        <div className="review-toolbar">
+          <div className="toolbar-left">
+            {/* Left Tray Toggle */}
+            <button
+              onClick={() => setIsLeftTrayOpen(true)}
+              className="toolbar-btn"
+              title="Load & Filter"
+            >
+              <span className="material-symbols-outlined">menu</span>
+            </button>
+            
+            {/* File Operations */}
+            <button
+              onClick={handleLoadAnnotationTask}
+              className="toolbar-btn"
+              title="Open Annotation File"
+              disabled={loading}
+            >
+              <span className="material-symbols-outlined">folder_open</span>
+            </button>
+            
+            <button
+              onClick={handleExportAnnotations}
+              className="toolbar-btn"
+              title="Save Annotations"
+              disabled={annotationData.length === 0}
+            >
+              <span className="material-symbols-outlined">save</span>
+            </button>
+
+            {/* Auto-save controls */}
+            <button
+              onClick={handleSelectAutoSaveLocation}
+              className="toolbar-btn"
+              title="Set Auto-save Location"
+              disabled={annotationData.length === 0}
+            >
+              <span className="material-symbols-outlined">save_as</span>
+            </button>
+
+            <button
+              onClick={() => setAutoSaveEnabled(!autoSaveEnabled)}
+              className={`toolbar-btn ${autoSaveEnabled ? 'active' : ''}`}
+              title={`Auto-save ${autoSaveEnabled ? 'ON' : 'OFF'}`}
+              disabled={annotationData.length === 0}
+            >
+              <span className="material-symbols-outlined">
+                {autoSaveEnabled ? 'sync' : 'sync_disabled'}
+              </span>
+            </button>
+          </div>
+
+          <div className="toolbar-center">
+            {annotationData.length > 0 && (
+              <>
+                {/* Focus/Grid Mode Toggle */}
                 <button
-                  className={`focus-toggle-btn ${isFocusMode ? 'active' : ''}`}
+                  className={`toolbar-btn ${isFocusMode ? 'active' : ''}`}
                   onClick={() => setIsFocusMode(!isFocusMode)}
-                  title={isFocusMode ? 'Switch to Grid View' : 'Switch to Focus Mode'}
+                  title={isFocusMode ? 'Switch to Grid View (Esc)' : 'Switch to Focus Mode (Esc)'}
                 >
                   <span className="material-symbols-outlined">
                     {isFocusMode ? 'grid_view' : 'fullscreen'}
                   </span>
-                  {isFocusMode ? 'Grid View' : 'Focus Mode'}
                 </button>
-              </div>
 
-              {/* Settings Button */}
-              <IconButton 
-                onClick={() => setIsSettingsPanelOpen(true)}
-                sx={{ 
-                  color: '#4f5d75',
-                  backgroundColor: '#ffffff',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '4px',
-                  padding: '0.5rem',
-                  '&:hover': { 
-                    backgroundColor: '#f3f4f6',
-                    borderColor: '#4f5d75'
-                  }
-                }}
-                title="Open Settings"
-              >
-                <SettingsIcon />
-              </IconButton>
-            </div>
-          )}
-        </div>
-
-        {/* File Input (hidden) */}
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".csv"
-          onChange={handleFileInputChange}
-          style={{ display: 'none' }}
-        />
-
-        {/* LOAD ANNOTATION TASK - BACK TO TOP */}
-        <div className="section">
-          <h3>Load Annotation Task</h3>
-          <p>Load a CSV file with columns: file, start_time, end_time (optional), annotation, comments (optional)</p>
-          
-          <div className="button-group">
-            <button onClick={handleLoadAnnotationTask} disabled={loading}>
-              {loading ? 'Loading...' : 'Load Annotation CSV'}
-            </button>
-            {selectedFile && (
-              <span className="selected-file">
-                Loaded: {selectedFile.split('/').pop()}
-              </span>
-            )}
-            {annotationData.length > 0 && (
-              <button
-                onClick={handleExportAnnotations}
-                className="primary-button"
-                disabled={!hasUnsavedChanges}
-              >
-                {hasUnsavedChanges ? 'Export Annotations *' : 'Export Annotations'}
-              </button>
-            )}
-          </div>
-
-          {/* Root Audio Path Setting - moved below button */}
-          <div className="audio-path-setting">
-            <label>
-              Root Audio Folder:
-              <div className="file-path-control">
-                <input
-                  type="text"
-                  value={rootAudioPath}
-                  onChange={(e) => setRootAudioPath(e.target.value)}
-                  placeholder="Leave empty for absolute paths"
-                  className="path-input"
-                />
-                <button 
-                  onClick={handleSelectRootAudioPath}
-                  className="select-folder-button"
-                  type="button"
+                {/* Comments Toggle */}
+                <button
+                  className={`toolbar-btn ${settings.show_comments ? 'active' : ''}`}
+                  onClick={() => handleSettingsChange({ ...settings, show_comments: !settings.show_comments })}
+                  title="Toggle Comments Visibility"
                 >
-                  Browse
+                  <span className="material-symbols-outlined">comment</span>
                 </button>
-              </div>
-            </label>
-            <div className="path-help-text">
-              <small>
-                This folder is used as the base path for relative file paths in the CSV. 
-                If empty, file paths are expected to be absolute.
-              </small>
-            </div>
-          </div>
 
-          {error && (
-            <div className="error-message">
-              {error}
-            </div>
-          )}
-
-          {hasUnsavedChanges && (
-            <div className="unsaved-changes-notice">
-              <strong>⚠ Unsaved changes</strong> - Remember to export your annotations when finished.
-            </div>
-          )}
-        </div>
-
-        {/* SPECTROGRAM GRID OR FOCUS VIEW - AFTER LOAD SECTION */}
-        {annotationData.length > 0 && (
-          <div className="section">
-            <h3>
-              Annotation Review
-              {settings.review_mode === 'binary' ? '(Binary Mode)' : '(Multi-class Mode)'}
-              {isFocusMode && ` - Focus Mode (${focusClipIndex + 1} of ${annotationData.length})`}
-            </h3>
-
-            {isFocusMode ? (
-              // Focus Mode View
-              <FocusView
-                clipData={{
-                  ...annotationData[focusClipIndex],
-                  // Find loaded spectrogram data for current clip
-                  ...loadedPageData.find(loaded => loaded.clip_id === annotationData[focusClipIndex]?.id) || {}
-                }}
-                onAnnotationChange={handleFocusAnnotationChange}
-                onNavigate={handleFocusNavigation}
-                settings={settings}
-                reviewMode={settings.review_mode}
-                availableClasses={availableClasses}
-                isLastClip={focusClipIndex === annotationData.length - 1}
-                autoAdvance={true}
-              />
-            ) : (
-              // Grid Mode View
-              <>
-                {renderPagination()}
-                {renderAnnotationGrid}
-                {renderPagination()}
+                {/* Page Navigation */}
+                {!isFocusMode && (
+                  <>
+                    <button
+                      className="toolbar-btn"
+                      onClick={() => setCurrentPage(prev => Math.max(0, prev - 1))}
+                      disabled={currentPage === 0}
+                      title="Previous Page"
+                    >
+                      <span className="material-symbols-outlined">chevron_left</span>
+                    </button>
+                    
+                    <span className="page-info">
+                      {currentPage + 1} / {totalPages}
+                    </span>
+                    
+                    <button
+                      className="toolbar-btn"
+                      onClick={() => setCurrentPage(prev => Math.min(totalPages - 1, prev + 1))}
+                      disabled={currentPage >= totalPages - 1}
+                      title="Next Page"
+                    >
+                      <span className="material-symbols-outlined">chevron_right</span>
+                    </button>
+                  </>
+                )}
               </>
             )}
           </div>
+
+          <div className="toolbar-right">
+            {/* Settings Button */}
+            <button
+              onClick={() => setIsSettingsPanelOpen(true)}
+              className="toolbar-btn"
+              title="Settings"
+            >
+              <span className="material-symbols-outlined">settings</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Error and status messages */}
+        {error && (
+          <div className="error-message">
+            {error}
+          </div>
         )}
+
+        {hasUnsavedChanges && (
+          <div className="unsaved-changes-notice">
+            <strong>⚠ Unsaved changes</strong> - Remember to export your annotations when finished.
+          </div>
+        )}
+
+        {/* Main Content Area - Grid or Focus View */}
+        <div className="review-content">
+          {annotationData.length > 0 && (
+            <>
+              {isFocusMode ? (
+                // Focus Mode View
+                <FocusView
+                  clipData={{
+                    ...filteredAnnotationData[focusClipIndex],
+                    // Find loaded spectrogram data for current clip
+                    ...loadedPageData.find(loaded => loaded.clip_id === filteredAnnotationData[focusClipIndex]?.id) || {}
+                  }}
+                  onAnnotationChange={handleFocusAnnotationChange}
+                  onCommentChange={handleFocusCommentChange}
+                  onNavigate={handleFocusNavigation}
+                  settings={settings}
+                  reviewMode={settings.review_mode}
+                  availableClasses={availableClasses}
+                  isLastClip={focusClipIndex === filteredAnnotationData.length - 1}
+                  autoAdvance={true}
+                />
+              ) : (
+                // Grid Mode View
+                <>
+                  {renderBulkAnnotationControls()}
+                  {renderAnnotationGrid}
+                </>
+              )}
+            </>
+          )}
+        </div>
 
         {/* PLACEHOLDER - SHOWN WHEN NO DATA LOADED */}
         {annotationData.length === 0 && !loading && !error && (
@@ -975,6 +1566,20 @@ function ReviewTab() {
                 <li><strong>comments</strong>: Text comments (optional)</li>
               </ul>
               <p>Choose between binary review (yes/no/unsure) or multi-class review modes.</p>
+              
+              {/* Load CSV Button */}
+              <div className="placeholder-actions">
+                <button 
+                  onClick={handleLoadAnnotationTask} 
+                  disabled={loading}
+                  className="primary-button load-csv-button"
+                >
+                  {loading ? 'Loading...' : 'Load Annotation CSV'}
+                </button>
+                <p className="load-button-help">
+                  <small>You can also use the menu button in the top-left to access loading and filtering options.</small>
+                </p>
+              </div>
             </div>
           </div>
         )}

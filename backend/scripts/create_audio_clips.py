@@ -54,24 +54,34 @@ def spec_to_image(spectrogram, range=None, colormap=None, channels=3, shape=None
     # Apply colormap
     if colormap and colormap not in ["greys", "greys_r"]:
         try:
-            logger.info(f"Applying colormap: {colormap}")
+            logger.info(f"COLORMAP DEBUG: Applying non-grayscale colormap: {colormap}")
+            logger.info(f"COLORMAP DEBUG: Spectrogram shape: {spectrogram.shape}, dtype: {spectrogram.dtype}")
+            logger.info(f"COLORMAP DEBUG: Spectrogram min/max: {np.min(spectrogram)}/{np.max(spectrogram)}")
+            
             cmap = plt.get_cmap(colormap)
             img_array = cmap(spectrogram)
-            logger.info(f"Colormap applied successfully, shape: {img_array.shape}")
+            logger.info(f"COLORMAP DEBUG: After colormap application - shape: {img_array.shape}, dtype: {img_array.dtype}")
+            logger.info(f"COLORMAP DEBUG: Color array min/max: {np.min(img_array)}/{np.max(img_array)}")
+            
             if len(img_array.shape) == 3 and img_array.shape[2] == 4:
                 img_array = img_array[:, :, :3]  # Remove alpha channel if present
-                logger.info(f"Removed alpha channel, new shape: {img_array.shape}")
+                logger.info(f"COLORMAP DEBUG: Removed alpha channel, new shape: {img_array.shape}")
+            
             # Ensure we have the right number of channels
             if channels == 1 and len(img_array.shape) == 3:
                 # Convert RGB to grayscale
                 img_array = np.mean(img_array[:, :, :3], axis=2)
-                logger.info("Converted RGB to grayscale")
+                logger.info("COLORMAP DEBUG: Converted RGB to grayscale")
             elif channels == 3 and len(img_array.shape) == 2:
                 # Convert grayscale to RGB by stacking
                 img_array = np.stack([img_array] * 3, axis=-1)
-                logger.info("Converted grayscale to RGB")
+                logger.info("COLORMAP DEBUG: Converted grayscale to RGB")
+                
+            logger.info(f"COLORMAP DEBUG: Final colored array - shape: {img_array.shape}, dtype: {img_array.dtype}")
+            logger.info(f"COLORMAP DEBUG: Final colored array min/max: {np.min(img_array)}/{np.max(img_array)}")
+            
         except Exception as e:
-            logger.error(f"Error applying colormap {colormap}: {e}, using default grayscale")
+            logger.error(f"COLORMAP ERROR: Error applying colormap {colormap}: {e}, using default grayscale")
             # Fall back to inverse grayscale
             if channels == 1:
                 img_array = 1.0 - spectrogram
@@ -142,13 +152,6 @@ def create_audio_clip_and_spectrogram(file_path, start_time, end_time, settings)
             out=np.full(spectrogram.shape, -np.inf),
         )
 
-        # Show reference frequency line if requested
-        if settings.get("show_reference_frequency", False):
-            ref_freq = settings.get("reference_frequency", 1000)
-            closest_index = np.abs(frequencies - ref_freq).argmin()
-            db_range = settings.get("dB_range", [-80, -20])
-            spectrogram[closest_index, :] = db_range[1]
-
         # Apply bandpass filter if requested
         if settings.get("use_bandpass", False):
             bandpass_range = settings.get("bandpass_range", [0, 10000])
@@ -159,8 +162,22 @@ def create_audio_clip_and_spectrogram(file_path, start_time, end_time, settings)
             spectrogram = spectrogram[lowest_index : highest_index + 1, :]
             frequencies = frequencies[lowest_index : highest_index + 1]
 
+        # Show reference frequency line if requested (after bandpass filtering)
+        if settings.get("show_reference_frequency", False):
+            ref_freq = settings.get("reference_frequency", 1000)
+            # Only add reference line if frequency is within the current range
+            if frequencies.min() <= ref_freq <= frequencies.max():
+                closest_index = np.abs(frequencies - ref_freq).argmin()
+                db_range = settings.get("dB_range", [-80, -20])
+                # Make the reference line very prominent
+                spectrogram[closest_index, :] = db_range[1]
+                logger.info(f"Added reference line at {ref_freq}Hz (index {closest_index})")
+            else:
+                logger.warning(f"Reference frequency {ref_freq}Hz is outside frequency range {frequencies.min()}-{frequencies.max()}Hz")
+
         # Convert spectrogram to image array
         colormap = settings.get("spectrogram_colormap", "greys_r")
+        logger.info(f"COLORMAP DEBUG: Using colormap '{colormap}' with settings: {settings}")
         img_array = spec_to_image(
             spectrogram,
             range=settings.get("dB_range", [-80, -20]),
@@ -183,21 +200,26 @@ def create_audio_clip_and_spectrogram(file_path, start_time, end_time, settings)
         img_buffer = BytesIO()
         
         # Convert numpy array to PIL Image for faster processing
-        logger.info(f"Final img_array shape: {img_array.shape}, dtype: {img_array.dtype}")
-        logger.info(f"Array min/max: {np.min(img_array)}/{np.max(img_array)}")
+        logger.info(f"FINAL IMAGE DEBUG: img_array shape: {img_array.shape}, dtype: {img_array.dtype}")
+        logger.info(f"FINAL IMAGE DEBUG: Array min/max: {np.min(img_array)}/{np.max(img_array)}")
         
         if len(img_array.shape) == 2:
             # Grayscale
-            logger.info("Creating grayscale PIL image")
+            logger.info("FINAL IMAGE DEBUG: Creating grayscale PIL image")
             pil_image = Image.fromarray(img_array, mode='L')
         else:
             # RGB
-            logger.info("Creating RGB PIL image")
+            logger.info("FINAL IMAGE DEBUG: Creating RGB PIL image")
+            logger.info(f"FINAL IMAGE DEBUG: RGB array shape: {img_array.shape}")
+            # Log a small sample of the RGB values to verify they're not grayscale
+            sample_pixel = img_array[img_array.shape[0]//2, img_array.shape[1]//2, :]
+            logger.info(f"FINAL IMAGE DEBUG: Sample pixel RGB values: {sample_pixel}")
+            
             # Ensure the array is the right type and shape for RGB
             if img_array.shape[2] == 3:
                 pil_image = Image.fromarray(img_array, mode='RGB')
             else:
-                logger.warning(f"Unexpected image shape: {img_array.shape}")
+                logger.warning(f"FINAL IMAGE DEBUG: Unexpected image shape: {img_array.shape}")
                 pil_image = Image.fromarray(img_array, mode='RGB')
         
         # Save to buffer as PNG

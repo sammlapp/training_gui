@@ -32,3 +32,6 @@ dist_electron/
 # Logs
 logs/
 *.log
+
+# Checkpoints
+*.ckpt

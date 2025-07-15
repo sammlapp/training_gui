@@ -39,6 +39,7 @@ ENV/
 *.pth
 *.pt
 *.onnx
+*.ckpt
 
 # Logs
 *.log
@@ -64,6 +65,7 @@ frontend/node_modules/
 frontend/build/
 frontend/dist/
 frontend/out/
+node_modules/
 
 # Environment variables
 .env
