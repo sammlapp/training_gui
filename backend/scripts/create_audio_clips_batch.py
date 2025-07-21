@@ -12,6 +12,7 @@ import numpy as np
 import librosa
 import scipy.signal
 import matplotlib
+
 matplotlib.use("Agg")  # Use non-interactive backend
 from pathlib import Path
 import base64
@@ -29,6 +30,7 @@ logging.basicConfig(
     handlers=[logging.StreamHandler(sys.stderr)],
 )
 logger = logging.getLogger(__name__)
+
 
 def spec_to_image(spectrogram, range=None, colormap=None, channels=3, shape=None):
     """Convert spectrogram to image array (fast version)"""
@@ -60,6 +62,7 @@ def spec_to_image(spectrogram, range=None, colormap=None, channels=3, shape=None
     # Resize if shape is specified
     if shape is not None:
         from scipy.ndimage import zoom
+
         zoom_factors = (shape[0] / img_array.shape[0], shape[1] / img_array.shape[1])
         if len(img_array.shape) == 3:
             zoom_factors = zoom_factors + (1,)
@@ -69,13 +72,16 @@ def spec_to_image(spectrogram, range=None, colormap=None, channels=3, shape=None
     img_array = (img_array * 255).astype(np.uint8)
     return img_array
 
-def process_single_clip(clip_data: Dict[str, Any], settings: Dict[str, Any]) -> Dict[str, Any]:
+
+def process_single_clip(
+    clip_data: Dict[str, Any], settings: Dict[str, Any]
+) -> Dict[str, Any]:
     """Process a single clip with optimized performance"""
     try:
         file_path = clip_data["file_path"]
         start_time = clip_data["start_time"]
         end_time = clip_data["end_time"]
-        
+
         # Load audio
         duration = end_time - start_time
         samples, sr = librosa.load(
@@ -132,17 +138,21 @@ def process_single_clip(clip_data: Dict[str, Any], settings: Dict[str, Any]) -> 
 
         # Create spectrogram image buffer (in-memory PNG)
         img_buffer = BytesIO()
-        
+
         # Convert numpy array to PIL Image for faster processing
         if len(img_array.shape) == 2:
-            pil_image = Image.fromarray(img_array, mode='L')
+            pil_image = Image.fromarray(img_array, mode="L")
         else:
-            pil_image = Image.fromarray(img_array, mode='RGB')
-        
+            pil_image = Image.fromarray(img_array, mode="RGB")
+
         # Save to buffer as PNG with optimization
         pil_image.save(img_buffer, format="PNG", optimize=True, compress_level=6)
         img_buffer.seek(0)
         img_base64 = base64.b64encode(img_buffer.read()).decode("utf-8")
+
+        # decode to image:
+        # image_data = base64.b64decode(img_base64)
+        # pil_image = Image.open(BytesIO(image_data))
 
         return {
             "clip_id": clip_data.get("clip_id", f"{file_path}_{start_time}_{end_time}"),
@@ -158,50 +168,68 @@ def process_single_clip(clip_data: Dict[str, Any], settings: Dict[str, Any]) -> 
     except Exception as e:
         logger.error(f"Error processing clip {clip_data}: {e}")
         return {
-            "clip_id": clip_data.get("clip_id", f"{clip_data.get('file_path', 'unknown')}_{clip_data.get('start_time', 0)}_{clip_data.get('end_time', 0)}"),
+            "clip_id": clip_data.get(
+                "clip_id",
+                f"{clip_data.get('file_path', 'unknown')}_{clip_data.get('start_time', 0)}_{clip_data.get('end_time', 0)}",
+            ),
             "status": "error",
-            "error": str(e)
+            "error": str(e),
         }
 
-def process_clips_batch(clips: List[Dict[str, Any]], settings: Dict[str, Any]) -> List[Dict[str, Any]]:
+
+def process_clips_batch(
+    clips: List[Dict[str, Any]], settings: Dict[str, Any]
+) -> List[Dict[str, Any]]:
     """Process multiple clips in parallel"""
     start_time = time.time()
-    
+
     # Use thread pool for I/O bound operations
     max_workers = min(settings.get("max_workers", 4), len(clips))
-    
+
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
         # Submit all tasks and maintain their order
-        future_to_index = {executor.submit(process_single_clip, clip, settings): i for i, clip in enumerate(clips)}
-        
+        future_to_index = {
+            executor.submit(process_single_clip, clip, settings): i
+            for i, clip in enumerate(clips)
+        }
+
         # Initialize results array with correct size
         results = [None] * len(clips)
-        
+
         # Collect results in order
         for future in concurrent.futures.as_completed(future_to_index):
             index = future_to_index[future]
             try:
                 result = future.result()
                 results[index] = result
-                logger.info(f"Clip {index}: {result.get('status', 'unknown')} - {clips[index].get('file_path', 'unknown')}")
+                logger.info(
+                    f"Clip {index}: {result.get('status', 'unknown')} - {clips[index].get('file_path', 'unknown')}"
+                )
             except Exception as e:
                 logger.error(f"Clip {index} failed: {e}")
                 results[index] = {
                     "clip_id": clips[index].get("clip_id", f"clip_{index}"),
                     "status": "error",
-                    "error": str(e)
+                    "error": str(e),
                 }
-    
+
     end_time = time.time()
-    successful_count = len([r for r in results if r and r.get('status') == 'success'])
-    logger.info(f"Processed {len(clips)} clips in {end_time - start_time:.2f} seconds - {successful_count} successful")
-    
+    successful_count = len([r for r in results if r and r.get("status") == "success"])
+    logger.info(
+        f"Processed {len(clips)} clips in {end_time - start_time:.2f} seconds - {successful_count} successful"
+    )
+
     return results
 
+
 def main():
-    parser = argparse.ArgumentParser(description="Batch create audio clips and spectrograms")
+    parser = argparse.ArgumentParser(
+        description="Batch create audio clips and spectrograms"
+    )
     parser.add_argument("--clips", required=True, help="JSON array of clip data")
-    parser.add_argument("--settings", required=True, help="JSON settings for spectrogram creation")
+    parser.add_argument(
+        "--settings", required=True, help="JSON settings for spectrogram creation"
+    )
 
     args = parser.parse_args()
 
@@ -222,7 +250,7 @@ def main():
             "total_clips": len(clips),
             "successful_clips": len([r for r in results if r["status"] == "success"]),
             "failed_clips": len([r for r in results if r["status"] == "error"]),
-            "results": results
+            "results": results,
         }
 
         print(json.dumps(output))
@@ -234,6 +262,7 @@ def main():
         print(json.dumps(error_output))
         sys.stdout.flush()
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()

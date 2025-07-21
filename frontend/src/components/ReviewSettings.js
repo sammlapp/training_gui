@@ -246,7 +246,7 @@ function ReviewSettings({ onSettingsChange, onReRenderSpectrograms, onClearCache
                     checked={settings.review_mode === 'binary'}
                     onChange={(e) => handleSettingChange('review_mode', e.target.value)}
                   />
-                  <span>Binary Review (Yes/No/Unsure)</span>
+                  <span>Binary Review (Yes/No/Uncertain)</span>
                 </label>
                 <label className="radio-label">
                   <input

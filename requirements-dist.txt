@@ -1,0 +1,18 @@
+# Python requirements for distribution build
+# Only PyTorch-based models (no TensorFlow)
+# Need 'ai-edge-litert' for birdnet, but its not available for windows yet
+
+torch>=2.0.0
+torchaudio>=2.0.0
+transformers>=4.0.0
+opensoundscape>=0.11.0
+timm>=0.9.0
+lightning>=2.0.0
+pandas>=1.5.0
+numpy>=1.21.0
+librosa>=0.9.0
+scikit-learn>=1.0.0
+matplotlib>=3.5.0
+seaborn>=0.11.0
+jupyter>=1.0.0
+git+https://github.com/kitzeslab/bioacoustics-model-zoo.git

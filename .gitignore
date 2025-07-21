@@ -65,7 +65,9 @@ frontend/node_modules/
 frontend/build/
 frontend/dist/
 frontend/out/
+frontend/python-env/
 node_modules/
+frontend/models--DBD*
 
 # Environment variables
 .env
@@ -75,3 +77,7 @@ node_modules/
 build/
 dist/
 out/
+backend/pyinstaller-venv/
+frontend/python-dist/
+backend/test-venv/bin/python
+backend/pyinstaller-venv-light/

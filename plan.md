@@ -80,8 +80,8 @@ User will select an annotation task. The interface will be very similar to that 
 - the annotation task is a csv with the relative audio path `file`, `start_time` in seconds of the clip within the audio path, `annotation`, and `comments`
 - grid of spectrogram/audio clip cards displayed to user, with pagination over all rows in the annotation task
 - there will be two review modes: binary review and multi-class review
-- binary review: as in binary_classification_review.py, there is a multi-select for 'yes' 'no' 'unsure' or 'unlabeled' for each audio clip. A visual effect (eg colored outline green/yellow/red/grey) indicates the current label of the clip. Optionally, the user can toggle on "show comment field" and write text comments. `annototation` value is yes/no/unsure or empty (nan) for not annotated
-- multi-class review: each audio clip panel has multi-select (react-select) instead of multi-select of yes/no/unsure/unlabeled. `annotation` column will contain a comma-separated list of classes ['a','b']. Empty list [] indicates annotated and no classes, whereas empty / nan indicates the clip has not been annotated. 
+- binary review: as in binary_classification_review.py, there is a multi-select for 'yes' 'no' 'uncertain' or 'unlabeled' for each audio clip. A visual effect (eg colored outline green/yellow/red/grey) indicates the current label of the clip. Optionally, the user can toggle on "show comment field" and write text comments. `annototation` value is yes/no/uncertain or empty (nan) for not annotated
+- multi-class review: each audio clip panel has multi-select (react-select) instead of multi-select of yes/no/uncertain/unlabeled. `annotation` column will contain a comma-separated list of classes ['a','b']. Empty list [] indicates annotated and no classes, whereas empty / nan indicates the clip has not been annotated. 
 - implement a settings panel with spectrogram window length, frequency bandpass range, dB range, colormap, number of rows and columns for grid of displayed clips, show/hide comments field, show/hide file name
 
 ## Shortcuts for review tab (when in grid view):
@@ -98,7 +98,6 @@ User will select an annotation task. The interface will be very similar to that 
 - in multi-class review mode, provides two filter multi-selects: filter by label with enable/disable, and filter by annotation status with enable/disable
 
 
-
 ## Review tab Focus view refinements
 - compact the controls: file name, annotation buttons, audio playback, comments, and forward/backward should all be smaller and be located neatly beneath the spectrogram view 
 
@@ -109,7 +108,7 @@ User will select an annotation task. The interface will be very similar to that 
 
 ## Focus mode for review tab
 - provide a toggle at the top of the review page to switch between viewing lots of clips on a page (current setup) and viewing a single, large spectrogram (click to play) in 'focus' mode.
-- in focus mode, offer these shortcuts for binary classification mode: "a" = yes, "s" = no, "d" = unsure, "f" = unlabeled. "j" view previous, "k" view next clip. spacebar to play/pause audio. 
+- in focus mode, offer these shortcuts for binary classification mode: "a" = yes, "s" = no, "d" = uncertain, "f" = unlabeled. "j" view previous, "k" view next clip. spacebar to play/pause audio. 
 - in focus mode, auto-advance to next clip when user clicks or uses shortcut to provide an annotation of yes/no/unknown/unlabeled
 - in settings panel, add a check box for whether to auto-play clips when using focus mode. When checked, the audio begins as soon as the spectrogram is displayed. 
 - help me debug why spectrograms appear as white-on-black instead of in color when choosing a colormap
@@ -123,13 +122,16 @@ User will select an annotation task. The interface will be very similar to that 
 
 # Incomplete items:
 
+#TODO update 
 - the multi-selects for filtering should use the same type of selector as the annotation panels, react-select
 
 # feature requests
+
+## rewind
 - throughout the application, when providing click-to-play spectrograms, make it so that clicking on the left 20% of the spectrogram rewinds the clip to the beginning instead of performing the play/pause action. Show a rewind icon when hovering over the left 20% of the spectrogram. 
 
 ## create inference or annotation tasks via filtering and stratification: 
-from wizard or from Explore tab
+from a "wizard" or from Explore tab
 
 start by creating or providing a table of audio file | location | start_timestamp | end timestamp
 
@@ -145,8 +147,15 @@ within stratification bins, selection based on score:
 - score-weighted or z-score weighted sampling
 - highest scoring N clips
 
+## preprocessing "wizard"
+
+## Remote mode
+- install on a remote machine accessed via SSH
+- replace native filesystem / other native system interactions with text fields or other working alternatives
+- make sure none of the other features depend on electron
+- provide instructions for port forwarding to access the gui on a web browser
+
 ## Training
-For now, model training will be limited to a "shallow classifier" strategy. That is, we will not attempt to fine-tune entire neural networks. Instead, we will train linear probes, MLPs, or similar shallow classifiers on embeddings generated with fixed models. 
 
 We will use a model configuration panel to load and save model configuration parameters to a config file. 
 Config: 
@@ -228,6 +237,9 @@ if evaluation_df is None:
 # load pre-trained network and change output classes
 # select model class based on config
 m = bmz.__getattribute__(config['model_name'])()
+
+#TODO: allow multi-layer classification head
+#TODO: implement attentive pooling
 m.change_classes(config['class_list'])
 m.device = config['device']
 
@@ -278,26 +290,32 @@ m.train(train_df, evaluation_df, epochs=config['epochs'], batch_size=config['bat
     ) -->
 
 ## embedding: 
-add toggle in inference script to embed instead or in addition
+add toggle in inference script to embed instead or in addition to classification
 
 # TODO fixes and tweaks
 
 # updates for review tab
-- do not allow auto-save location to persist across app restarts. Saving location should be cleared on restart or any time an annotation df is opened 
-- in focus mode, the content should be centered and use an inner div, but currently it is aligned left
-- focus mode: use segmented control instead of large buttons for annotation options; make the area holding the controls wider, so that the comment field is larger. Keep the vertical spacing tight. 
-- should auto-save when page changes in grid view or on forward/backward in focus view, not every time user clicks an annotation button in grid view
-- 'unknown' is currently treated differently than 'unlabeled'. However, these are meant to be equivalent: clicking the grey circle should result in a NaN value in the dataframe, which we will call 'unlabeled'. Clicking this button should result in the segmented control having no selection. Change the symbol to a "reset" symbol for clarity. 
 
-- reference frequency line not showing
+- Focus mode: move comments field to sit on the right side of the controls, rather than below the other controls. Use the full width for the controls + comment field. 
 
-- colormaps for spectrograms render properly in the explore tab but not in the review tab (still greyscale)
+- review-content focus-mode and review-content grid-mode divs are taking up space even when they are empty. This causes the "ready for annotation review" text to display far down the page under the empty but large grid-mode div. It might also be the reason that there is always a scroll bar even when the page is not full
+
+- reference frequency line not showing. To create the reference frequency line, should make the pixels maximal value at the relevant row of the spectrogram. 
+
+- there is small black line at bottom of every spectrogram, but only when resizing is enabled. Seems to be an issue with the backend spectrogram creation creating a row of zeros 
+
+- bottom status bar and top button bar: currenlty they can scroll out of view but they should always be visible. Should not be in an outer div that doesn't scroll with the content.
 
 consolidate the global theming options into a simple config or css file, so that I can make edits to the set of colors, fonts, font weights, font sizes, overall spacing values in one place for the entire app. 
 
+
 ## inference updates:
 - implement saving and loading all inference settings, including paths, to a config file
-- refactor as "create inference task" -> task gets a name, and same options as the app currently has, then launches background task and monitors progress in a pane that monitors each task. API is not disabled, instead user can create additional inference tasks that will run after the running one is complete. Tasks pane monitors completed, running, and queued prediction tasks
+- refactor as "create inference tasks" -> when user selects settings and clicks 'create and run task', task gets a name then launches background task and monitors progress in a pane that monitors each task. Alternatively can click 'create tasks' to create but not start the inference task. API is not disabled when task begins: instead, user can create additional inference tasks that are queued to run after the running one is complete. A tasks pane monitors tue status of inference tasks: completed, running, failed, queued, or unstarted. Buttons next to each task allow users to:
+  - start unstarted tasks (run immediately if no task is running, otherwise add to queue)
+  - rerun completed or canceled tasks
+  - cancel a running task (interrupts / kills the background process)
+  Make sure the task pane persists or re-loads appropriately if the user navigates to another tab and back. 
 - subset classes: can use text file or ebird filter
 - optional sparse outputs: don't save scores below a floor, and save df as a sparse pickle
 
@@ -308,16 +326,18 @@ consolidate the global theming options into a simple config or css file, so that
 
 # Explore tab updates
 - remove "Score Distribution" text from the panel headings
-- when you click on a histogram bar, it says "click to load spectrogram" but should instead say "loading spectrogram..."  
-- should have a little button in the panel (gold medal icon?) to return to viewing the highest-scoring clip (eg after clicking on a histogram bin)
+- when you click on a histogram bar, panel says "click to load spectrogram" but should instead say "loading spectrogram..."  
+- should have a little button in the panel (gold medal icon: 🥇) to return to viewing the highest-scoring clip (eg after clicking on a histogram bin)
 - put the settings in a side panel, exactly like the settings in the review tab
-- 
-## initial share-able desktop app
-- remove the settings panel, we don't need it
-- remove the training panel for now
-- package the app as a desktop app in whatever way will be easy to  share with users on Windows + Mac, and be robust to cross platform issues. We can use GitHub runners to make windows builds, for now just make a Mac build since I'm on a mac
-- for Inference, only allow use of those models in the bioacoustics model zoo which don't require TensorFlow (exclude: Perch, BirdNET, and SeparationModel)
-- include one Python environment with all required packages, including `torch, torchaudio, opensoundscape, timm, lightning, git+https://github.com/kitzeslab/bioacoustics-model-zoo.git`
+- use Material UI badges and small photos of the class detected for quick overview (use birdnames repo for name translation, find open-source set of images for species headshots or use the global bird svgs dataset)
+
+## build strategy
+- we will use pyinstaller to build an executable for the backend scripts EXCLUDING ml and heavy dependencies (no predict, train embed). The scripts should only depend on pandas, matplotlib, numpy, librosa, etc. They will not require pytorch, opensoundscape, or bioacoustics-model-zoo
+- to do this, we should first refactor get_sample_detections to use librosa and pillow (PIL) rather than opensoundscape (use create_audio_clips.create_audio_clip_and_spectrogram)
+- we will build frozen python enviornment(s) that will be downloaded on an as-needed basis: for now, just pytorch.yml which we will build using conda-pack to create a .tar.gz. Adapt the backend/requirements.txt to create pytorch_env_requirements.yml, I've specified the required dependencies for the pytorch models inference and training in that file. 
+- inference will run in the background by writing a config file, and running the python script specifying the inference environment python, eg `/path/to/pytorch_env/bin/python inference.py --config inference_config.yml" (but in background)
+- make sure we can build the app, communicate between the frontend and backend with the pyinstaller compiled simpler backend enviornment, build the distributable environment with conda-pack, and run a simple python script using the conda-pack env
+
 
 
 ## long-term plan for shipping environments for BMZ models

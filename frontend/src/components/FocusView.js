@@ -218,7 +218,7 @@ function FocusView({
   const binaryOptions = [
     { value: 'yes', label: 'Yes', key: 'a', color: 'rgb(145, 180, 135)' },
     { value: 'no', label: 'No', key: 's', color: 'rgb(207, 122, 107)' },
-    { value: 'unsure', label: 'Unsure', key: 'd', color: 'rgb(237, 223, 177)' },
+    { value: 'uncertain', label: 'Uncertain', key: 'd', color: 'rgb(237, 223, 177)' },
     { value: 'unlabeled', label: 'Unlabeled', key: 'f', color: 'rgb(223, 223, 223)' }
   ];
 
@@ -294,12 +294,12 @@ function FocusView({
           break;
         case 'd':
           if (reviewMode === 'binary') {
-            handleAnnotationChangeWithAdvance('unsure');
+            handleAnnotationChangeWithAdvance('uncertain');
           }
           break;
         case 'f':
           if (reviewMode === 'binary') {
-            handleAnnotationChangeWithAdvance('');
+            handleAnnotationChangeWithAdvance(null);
           }
           break;
         case 'j':
@@ -398,7 +398,7 @@ function FocusView({
           </div>
         </div>
 
-        {/* Binary annotation controls */}
+        {/* Binary annotation controls with comments on the right */}
         {reviewMode === 'binary' && (
           <div className="focus-annotation-controls">
             <div className="focus-binary-segmented-control">
@@ -429,10 +429,19 @@ function FocusView({
                 </button>
               ))}
             </div>
+            <div className="focus-comments-right">
+              <textarea
+                placeholder="Comments..."
+                value={localComment}
+                onChange={handleCommentChange}
+                className="focus-comment-textarea-right"
+                rows={2}
+              />
+            </div>
           </div>
         )}
 
-        {/* Multi-class annotation controls */}
+        {/* Multi-class annotation controls with comments on the right */}
         {reviewMode === 'multiclass' && (
           <div className="focus-annotation-controls">
             <div className="focus-multiclass-controls">
@@ -511,6 +520,15 @@ function FocusView({
                 </div>
               </div>
             </div>
+            <div className="focus-comments-right">
+              <textarea
+                placeholder="Comments..."
+                value={localComment}
+                onChange={handleCommentChange}
+                className="focus-comment-textarea-right"
+                rows={2}
+              />
+            </div>
           </div>
         )}
 
@@ -552,17 +570,8 @@ function FocusView({
           </div>
         )}
 
-        {/* Comments and navigation row */}
-        <div className="focus-bottom-row">
-          <div className="focus-comments-compact">
-            <textarea
-              placeholder="Comments..."
-              value={localComment}
-              onChange={handleCommentChange}
-              className="focus-comment-textarea-compact"
-              rows={2}
-            />
-          </div>
+        {/* Navigation row */}
+        <div className="focus-navigation-row">
           <div className="focus-navigation-compact">
             <button 
               className="nav-btn"
@@ -586,7 +595,7 @@ function FocusView({
         <div className="focus-shortcuts-help">
           <small>
             <strong>Shortcuts:</strong> 
-            {reviewMode === 'binary' && ' a=Yes, s=No, d=Unsure, f=Unlabeled |'} 
+            {reviewMode === 'binary' && ' a=Yes, s=No, d=Uncertain, f=Unlabeled |'} 
             j=Previous, k=Next | Space=Play/Pause
           </small>
         </div>

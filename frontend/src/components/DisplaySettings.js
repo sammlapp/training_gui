@@ -40,10 +40,10 @@ function DisplaySettings({ onSettingsChange }) {
   const handleSettingChange = (key, value) => {
     const newSettings = { ...settings, [key]: value };
     setSettings(newSettings);
-    
+
     // Save to localStorage
     localStorage.setItem('visualization_settings', JSON.stringify(newSettings));
-    
+
     // Notify parent component
     if (onSettingsChange) {
       onSettingsChange(newSettings);
@@ -69,7 +69,7 @@ function DisplaySettings({ onSettingsChange }) {
 
   return (
     <div className="display-settings">
-      <button 
+      <button
         className="settings-toggle"
         onClick={() => setIsCollapsed(!isCollapsed)}
         aria-expanded={!isCollapsed}
@@ -77,7 +77,7 @@ function DisplaySettings({ onSettingsChange }) {
         <span>Display Settings</span>
         <span className="toggle-icon">{isCollapsed ? '▶' : '▼'}</span>
       </button>
-      
+
       {!isCollapsed && (
         <div className="settings-panel">
           <div className="settings-grid">
@@ -87,13 +87,17 @@ function DisplaySettings({ onSettingsChange }) {
                 value={settings.spec_window_size}
                 onChange={(e) => handleSettingChange('spec_window_size', parseInt(e.target.value))}
               >
+                <option value={32}>32</option>
+                <option value={64}>64</option>
+                <option value={128}>128</option>
                 <option value={256}>256</option>
                 <option value={512}>512</option>
                 <option value={1024}>1024</option>
                 <option value={2048}>2048</option>
+                <option value={4096}>4096</option>
               </select>
             </label>
-            
+
             <label>
               Colormap:
               <select
@@ -107,14 +111,14 @@ function DisplaySettings({ onSettingsChange }) {
                 ))}
               </select>
             </label>
-            
+
             <label>
               dB Min:
               <input
                 type="number"
                 value={settings.dB_range[0]}
                 onChange={(e) => handleSettingChange('dB_range', [
-                  parseInt(e.target.value), 
+                  parseInt(e.target.value),
                   settings.dB_range[1]
                 ])}
                 min="-120"
@@ -122,14 +126,14 @@ function DisplaySettings({ onSettingsChange }) {
                 step="5"
               />
             </label>
-            
+
             <label>
               dB Max:
               <input
                 type="number"
                 value={settings.dB_range[1]}
                 onChange={(e) => handleSettingChange('dB_range', [
-                  settings.dB_range[0], 
+                  settings.dB_range[0],
                   parseInt(e.target.value)
                 ])}
                 min="-120"
@@ -137,14 +141,14 @@ function DisplaySettings({ onSettingsChange }) {
                 step="5"
               />
             </label>
-            
+
             <label>
               Bandpass Low (Hz):
               <input
                 type="number"
                 value={settings.bandpass_range[0]}
                 onChange={(e) => handleSettingChange('bandpass_range', [
-                  parseInt(e.target.value), 
+                  parseInt(e.target.value),
                   settings.bandpass_range[1]
                 ])}
                 min="50"
@@ -153,14 +157,14 @@ function DisplaySettings({ onSettingsChange }) {
                 disabled={!settings.use_bandpass}
               />
             </label>
-            
+
             <label>
               Bandpass High (Hz):
               <input
                 type="number"
                 value={settings.bandpass_range[1]}
                 onChange={(e) => handleSettingChange('bandpass_range', [
-                  settings.bandpass_range[0], 
+                  settings.bandpass_range[0],
                   parseInt(e.target.value)
                 ])}
                 min="1000"
@@ -169,7 +173,7 @@ function DisplaySettings({ onSettingsChange }) {
                 disabled={!settings.use_bandpass}
               />
             </label>
-            
+
             <label>
               Reference Freq (Hz):
               <input
@@ -183,7 +187,7 @@ function DisplaySettings({ onSettingsChange }) {
               />
             </label>
           </div>
-          
+
           <div className="settings-toggles">
             <label className="toggle-label">
               <input
@@ -193,7 +197,7 @@ function DisplaySettings({ onSettingsChange }) {
               />
               <span>Enable Bandpass Filter</span>
             </label>
-            
+
             <label className="toggle-label">
               <input
                 type="checkbox"
@@ -203,9 +207,9 @@ function DisplaySettings({ onSettingsChange }) {
               <span>Show Reference Frequency Line</span>
             </label>
           </div>
-          
+
           <div className="settings-actions">
-            <button 
+            <button
               className="reset-button"
               onClick={resetToDefaults}
             >

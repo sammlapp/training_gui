@@ -47,7 +47,7 @@ function ReviewTab() {
     annotation_status: { enabled: false, values: [] }
   });
   const [autoSaveEnabled, setAutoSaveEnabled] = useState(true);
-  const [autoSaveLocation, setAutoSaveLocation] = useState('');
+  const [currentSavePath, setCurrentSavePath] = useState(null); // Session save path
   const fileInputRef = useRef(null);
 
   // HTTP-based loader (fast and reliable)
@@ -270,26 +270,68 @@ function ReviewTab() {
     }
   }, [currentPage, currentDataVersion, rootAudioPath, filteredAnnotationData.length, settings.grid_rows, settings.grid_columns]);
 
-  // Auto-save on page changes
+  // Auto-save on page changes (only trigger when page actually changes)
   useEffect(() => {
     if (annotationData.length > 0 && autoSaveEnabled && hasUnsavedChanges) {
       performAutoSave();
     }
-  }, [currentPage, annotationData.length, autoSaveEnabled, hasUnsavedChanges]);
+  }, [currentPage]); // Only trigger on page changes, not when hasUnsavedChanges changes
 
-  // Auto-save on focus clip changes
+  // Auto-save on focus clip navigation (focus mode only)
   useEffect(() => {
     if (isFocusMode && annotationData.length > 0 && autoSaveEnabled && hasUnsavedChanges) {
       performAutoSave();
     }
-  }, [focusClipIndex, isFocusMode, annotationData.length, autoSaveEnabled, hasUnsavedChanges]);
+  }, [focusClipIndex, isFocusMode]); // Only trigger on clip navigation, not on annotation changes
 
-  // Clear auto-save location on app restart (mount)
+  // Clear save path on app startup
   useEffect(() => {
-    // Clear auto-save location on app restart
-    setAutoSaveLocation('');
+    // Clear save path on app restart
+    setCurrentSavePath(null);
     localStorage.removeItem('review_autosave_location');
   }, []);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = async (event) => {
+      // Ctrl/Cmd+S for Save
+      if ((event.ctrlKey || event.metaKey) && event.key === 's') {
+        event.preventDefault();
+        if (annotationData.length > 0) {
+          // Inline save logic to avoid dependency issues
+          try {
+            if (currentSavePath && window.electronAPI?.writeFile) {
+              const csvContent = exportToCSV();
+              await window.electronAPI.writeFile(currentSavePath, csvContent);
+              setHasUnsavedChanges(false);
+              console.log('Saved to:', currentSavePath);
+            } else {
+              // Trigger Save As dialog
+              const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+              const defaultName = `annotations_${timestamp}.csv`;
+              if (window.electronAPI?.saveFile) {
+                const filePath = await window.electronAPI.saveFile(defaultName);
+                if (filePath) {
+                  const csvContent = exportToCSV();
+                  await window.electronAPI.writeFile(filePath, csvContent);
+                  setCurrentSavePath(filePath);
+                  setHasUnsavedChanges(false);
+                }
+              }
+            }
+          } catch (err) {
+            console.error('Save failed:', err);
+            setError('Save failed: ' + err.message);
+          }
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [annotationData.length, currentSavePath]);
 
   // Separate effect to detect when NEW data is loaded (not just annotations changed)
   useEffect(() => {
@@ -345,8 +387,8 @@ function ReviewTab() {
       extractAvailableClasses(data);
       setCurrentPage(0);
       setHasUnsavedChanges(false);
-      // Clear auto-save location when new annotation file is loaded
-      setAutoSaveLocation('');
+      // Clear save path when new annotation file is loaded
+      setCurrentSavePath(null);
       localStorage.removeItem('review_autosave_location');
     } catch (err) {
       setError('Failed to parse CSV file: ' + err.message);
@@ -392,8 +434,8 @@ function ReviewTab() {
         extractAvailableClasses(data.clips);
         setCurrentPage(0);
         setHasUnsavedChanges(false);
-        // Clear auto-save location when new annotation file is loaded
-        setAutoSaveLocation('');
+        // Clear save path when new annotation file is loaded
+        setCurrentSavePath(null);
         localStorage.removeItem('review_autosave_location');
       }
     } catch (err) {
@@ -548,9 +590,9 @@ function ReviewTab() {
       return newArray;
     });
     setHasUnsavedChanges(true);
-    
-    // Remove individual annotation auto-save - only auto-save on page/navigation changes
-  }, [settings.review_mode, isFocusMode, autoSaveEnabled, hasUnsavedChanges]);
+
+    // Individual annotation changes don't trigger auto-save - only page/navigation changes do
+  }, [settings.review_mode]);
 
   const handleCommentChange = useCallback((clipId, newComment) => {
     setAnnotationData(prev => {
@@ -733,7 +775,7 @@ function ReviewTab() {
           case 's':
             if (!event.shiftKey) {
               // Ctrl/Cmd+S: Save annotations
-              handleExportAnnotations();
+              handleSave();
               return;
             }
             break;
@@ -769,9 +811,9 @@ function ReviewTab() {
             break;
           case 'd':
             if (event.shiftKey) {
-              // Cmd/Ctrl+Shift+D: bulk annotate as Unsure
+              // Cmd/Ctrl+Shift+D: bulk annotate as Uncertain
               if (settings.review_mode === 'binary') {
-                handleBulkAnnotation('unsure');
+                handleBulkAnnotation('uncertain');
               }
             }
             break;
@@ -911,54 +953,59 @@ function ReviewTab() {
     }
   };
 
-  const handleSelectAutoSaveLocation = async () => {
-    try {
-      if (!window.electronAPI) {
-        alert('Auto-save location selection is only available in the desktop app');
-        return;
-      }
-
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-      const defaultName = `annotations_${timestamp}.csv`;
-      const filePath = await window.electronAPI.saveFile(defaultName);
-
-      if (filePath) {
-        setAutoSaveLocation(filePath);
-        // Save to localStorage
-        localStorage.setItem('review_autosave_location', filePath);
-      }
-    } catch (err) {
-      console.error('Failed to select auto-save location:', err);
-    }
-  };
 
   const performAutoSave = async () => {
     if (!autoSaveEnabled || !hasUnsavedChanges) return;
 
     try {
-      let saveLocation = autoSaveLocation;
+      let saveLocation = currentSavePath;
 
-      // If no location set, prompt for one
+      // If no save path set, open save dialog
       if (!saveLocation) {
-        await handleSelectAutoSaveLocation();
-        saveLocation = autoSaveLocation;
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        const defaultName = `annotations_${timestamp}.csv`;
+
+        if (window.electronAPI?.saveFile) {
+          saveLocation = await window.electronAPI.saveFile(defaultName);
+          if (saveLocation) {
+            setCurrentSavePath(saveLocation);
+          } else {
+            return; // User cancelled save dialog
+          }
+        }
       }
 
-      if (saveLocation) {
+      if (saveLocation && window.electronAPI?.writeFile) {
         const csvContent = exportToCSV();
-
-        if (window.electronAPI?.writeFile) {
-          await window.electronAPI.writeFile(saveLocation, csvContent);
-          setHasUnsavedChanges(false);
-          console.log('Auto-saved to:', saveLocation);
-        }
+        await window.electronAPI.writeFile(saveLocation, csvContent);
+        setHasUnsavedChanges(false);
+        console.log('Auto-saved to:', saveLocation);
       }
     } catch (err) {
       console.error('Auto-save failed:', err);
     }
   };
 
-  const handleExportAnnotations = async () => {
+  const handleSave = async () => {
+    try {
+      // If we have a save path, use it directly
+      if (currentSavePath && window.electronAPI?.writeFile) {
+        const csvContent = exportToCSV();
+        await window.electronAPI.writeFile(currentSavePath, csvContent);
+        setHasUnsavedChanges(false);
+        console.log('Saved to:', currentSavePath);
+        return;
+      }
+
+      // No save path set, fall back to Save As behavior
+      await handleSaveAs();
+    } catch (err) {
+      console.error('Save failed:', err);
+      setError('Save failed: ' + err.message);
+    }
+  };
+
+  const handleSaveAs = async () => {
     try {
       if (!window.electronAPI) {
         // Browser fallback - create downloadable file
@@ -983,6 +1030,7 @@ function ReviewTab() {
         const filePath = await window.electronAPI.saveFile(defaultName);
         if (filePath) {
           await window.electronAPI.writeFile(filePath, csvContent);
+          setCurrentSavePath(filePath); // Set the save path for future auto-saves
           setHasUnsavedChanges(false);
         }
       } else {
@@ -1036,39 +1084,6 @@ function ReviewTab() {
   }, [settings.grid_rows, settings.grid_columns]);
 
 
-  const renderBulkAnnotationControls = () => {
-    if (settings.review_mode !== 'binary' || currentPageData.length === 0) return null;
-
-    const binaryOptions = [
-      { value: 'yes', label: 'Yes', color: 'rgb(145, 180, 135)' },
-      { value: 'no', label: 'No', color: 'rgb(207, 122, 107)' },
-      { value: 'unsure', label: 'Unsure', color: 'rgb(237, 223, 177)' },
-      { value: 'unlabeled', label: 'Unlabeled', color: 'rgb(223, 223, 223)' }
-    ];
-
-    return (
-      <div className="bulk-annotation-controls">
-        <span className="bulk-annotation-label">Label all clips on this page:</span>
-        <div className="bulk-annotation-buttons">
-          {binaryOptions.map(option => (
-            <button
-              key={option.value}
-              className="bulk-annotation-button"
-              style={{
-                backgroundColor: option.color,
-                color: 'white',
-                border: `2px solid ${option.color}`
-              }}
-              onClick={() => handleBulkAnnotation(option.value)}
-              title={`Mark all ${currentPageData.length} clips on this page as ${option.label}`}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-      </div>
-    );
-  };
 
   const renderAnnotationGrid = useMemo(() => {
     const currentData = currentPageData;
@@ -1179,11 +1194,11 @@ function ReviewTab() {
               )}
               {annotationData.length > 0 && (
                 <button
-                  onClick={handleExportAnnotations}
+                  onClick={handleSave}
                   className="primary-button"
                   disabled={!hasUnsavedChanges}
                 >
-                  {hasUnsavedChanges ? 'Export Annotations *' : 'Export Annotations'}
+                  {hasUnsavedChanges ? 'Save Annotations *' : 'Save Annotations'}
                 </button>
               )}
             </div>
@@ -1223,11 +1238,6 @@ function ReviewTab() {
               </div>
             )}
 
-            {hasUnsavedChanges && (
-              <div className="unsaved-changes-notice">
-                <strong>⚠ Unsaved changes</strong> - Remember to export your annotations when finished.
-              </div>
-            )}
           </div>
 
           {/* Filtering Section */}
@@ -1438,24 +1448,27 @@ function ReviewTab() {
               <span className="material-symbols-outlined">folder_open</span>
             </button>
 
+            {/* Save button */}
             <button
-              onClick={handleExportAnnotations}
+              onClick={handleSave}
               className="toolbar-btn"
-              title="Save Annotations"
+              title={currentSavePath ? `Save to ${currentSavePath.split('/').pop()}` : "Save (will open save dialog)"}
               disabled={annotationData.length === 0}
             >
               <span className="material-symbols-outlined">save</span>
             </button>
 
-            {/* Auto-save controls */}
+            {/* Save As button */}
             <button
-              onClick={handleSelectAutoSaveLocation}
+              onClick={handleSaveAs}
               className="toolbar-btn"
-              title="Set Auto-save Location"
+              title="Save As..."
               disabled={annotationData.length === 0}
             >
               <span className="material-symbols-outlined">save_as</span>
             </button>
+
+            {/* Auto-save controls */}
 
             <button
               onClick={() => setAutoSaveEnabled(!autoSaveEnabled)}
@@ -1467,6 +1480,18 @@ function ReviewTab() {
                 {autoSaveEnabled ? 'sync' : 'sync_disabled'}
               </span>
             </button>
+
+            {/* Save Status Indicator */}
+            {annotationData.length > 0 && (
+              <div className="save-status-indicator">
+                <span
+                  className={`material-symbols-outlined ${hasUnsavedChanges ? 'unsaved' : 'saved'}`}
+                  title={hasUnsavedChanges ? 'Unsaved changes' : 'All changes saved'}
+                >
+                  {hasUnsavedChanges ? 'edit' : 'check_circle'}
+                </span>
+              </div>
+            )}
           </div>
 
           <div className="toolbar-center">
@@ -1482,6 +1507,44 @@ function ReviewTab() {
                     {isFocusMode ? 'grid_view' : 'fullscreen'}
                   </span>
                 </button>
+
+                {/* Bulk Annotation Controls - Only show in Grid mode for binary mode */}
+                {!isFocusMode && settings.review_mode === 'binary' && currentPageData.length > 0 && (
+                  <div className="toolbar-bulk-controls">
+                    <button
+                      className="toolbar-btn bulk-btn"
+                      onClick={() => handleBulkAnnotation('yes')}
+                      title={`Mark all ${currentPageData.length} clips on this page as Yes`}
+                      style={{ color: 'rgb(145, 180, 135)' }}
+                    >
+                      <span className="material-symbols-outlined">check_circle</span>
+                    </button>
+                    <button
+                      className="toolbar-btn bulk-btn"
+                      onClick={() => handleBulkAnnotation('no')}
+                      title={`Mark all ${currentPageData.length} clips on this page as No`}
+                      style={{ color: 'rgb(207, 122, 107)' }}
+                    >
+                      <span className="material-symbols-outlined">cancel</span>
+                    </button>
+                    <button
+                      className="toolbar-btn bulk-btn"
+                      onClick={() => handleBulkAnnotation('uncertain')}
+                      title={`Mark all ${currentPageData.length} clips on this page as Uncertain`}
+                      style={{ color: 'rgb(237, 223, 177)' }}
+                    >
+                      <span className="material-symbols-outlined">help</span>
+                    </button>
+                    <button
+                      className="toolbar-btn bulk-btn"
+                      onClick={() => handleBulkAnnotation('unlabeled')}
+                      title={`Mark all ${currentPageData.length} clips on this page as Unlabeled`}
+                      style={{ color: 'rgb(223, 223, 223)' }}
+                    >
+                      <span className="material-symbols-outlined">restart_alt</span>
+                    </button>
+                  </div>
+                )}
 
                 {/* Comments Toggle - Only show in Grid mode */}
                 {!isFocusMode && (
@@ -1508,8 +1571,8 @@ function ReviewTab() {
                 )}
 
                 {/* Page Navigation */}
-                {!isFocusMode && (
-                  <>
+                {!isFocusMode && totalPages > 1 && (
+                  <div className="page-navigation">
                     <button
                       className="toolbar-btn"
                       onClick={() => setCurrentPage(prev => Math.max(0, prev - 1))}
@@ -1519,9 +1582,18 @@ function ReviewTab() {
                       <span className="material-symbols-outlined">chevron_left</span>
                     </button>
 
-                    <span className="page-info">
-                      {currentPage + 1} / {totalPages}
-                    </span>
+                    <select
+                      className="page-dropdown"
+                      value={currentPage}
+                      onChange={(e) => setCurrentPage(parseInt(e.target.value))}
+                      title="Go to page"
+                    >
+                      {Array.from({ length: totalPages }, (_, i) => (
+                        <option key={i} value={i}>
+                          Page {i + 1}
+                        </option>
+                      ))}
+                    </select>
 
                     <button
                       className="toolbar-btn"
@@ -1531,7 +1603,7 @@ function ReviewTab() {
                     >
                       <span className="material-symbols-outlined">chevron_right</span>
                     </button>
-                  </>
+                  </div>
                 )}
               </>
             )}
@@ -1556,15 +1628,10 @@ function ReviewTab() {
           </div>
         )}
 
-        {hasUnsavedChanges && (
-          <div className="unsaved-changes-notice">
-            <strong>⚠ Unsaved changes</strong> - Remember to export your annotations when finished.
-          </div>
-        )}
 
         {/* Main Content Area - Grid or Focus View */}
-        <div className={`review-content ${isFocusMode ? 'focus-mode' : 'grid-mode'}`}>
-          {annotationData.length > 0 && (
+        <div className={`review-content ${annotationData.length > 0 ? (isFocusMode ? 'focus-mode' : 'grid-mode') : 'placeholder-mode'}`}>
+          {annotationData.length > 0 ? (
             <>
               {isFocusMode ? (
                 // Focus Mode View - Centered
@@ -1588,50 +1655,83 @@ function ReviewTab() {
               ) : (
                 // Grid Mode View
                 <>
-                  {renderBulkAnnotationControls()}
                   {renderAnnotationGrid}
                 </>
               )}
             </>
+          ) : (
+            /* PLACEHOLDER - SHOWN WHEN NO DATA LOADED */
+            !loading && !error && (
+              <div className="placeholder-container">
+                <div className="placeholder-content">
+                  <div className="placeholder-icon">📝</div>
+                  <h3>Ready for Annotation Review</h3>
+                  <p>Load a CSV file to begin reviewing and annotating audio clips. The CSV should contain:</p>
+                  <ul>
+                    <li><strong>file</strong>: Path to audio file</li>
+                    <li><strong>start_time</strong>: Start time in seconds</li>
+                    <li><strong>end_time</strong>: End time in seconds (optional)</li>
+                    <li>Either <strong>annotation</strong>: Binary classification label (yes/no/uncertain)</li>
+                    <li>Or <strong>labels</strong> and <strong>complete</strong>: Comma-separated labels for multi-class annotations</li>
+                    <li><strong>comments</strong>: Text comments (optional)</li>
+                  </ul>
+                  <p>Choose between binary review (yes/no/uncertain) or multi-class review modes.</p>
+
+                  {/* Load CSV Button */}
+                  <div className="placeholder-actions">
+                    <button
+                      onClick={handleLoadAnnotationTask}
+                      disabled={loading}
+                      className="primary-button load-csv-button"
+                    >
+                      {loading ? 'Loading...' : 'Load Annotation CSV'}
+                    </button>
+                    <p className="load-button-help">
+                      <small>You can also use the menu button in the top-left to access loading and filtering options.</small>
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )
           )}
         </div>
 
-        {/* PLACEHOLDER - SHOWN WHEN NO DATA LOADED */}
-        {annotationData.length === 0 && !loading && !error && (
-          <div className="review-content focus-mode">
-            <div className="placeholder-container">
-              <div className="placeholder-content">
-                <div className="placeholder-icon">📝</div>
-                <h3>Ready for Annotation Review</h3>
-                <p>Load a CSV file to begin reviewing and annotating audio clips. The CSV should contain:</p>
-                <ul>
-                  <li><strong>file</strong>: Path to audio file</li>
-                  <li><strong>start_time</strong>: Start time in seconds</li>
-                  <li><strong>end_time</strong>: End time in seconds (optional)</li>
-                  <li>Either <strong>annotation</strong>: Binary classification label (yes/no/unsure)</li>
-                  <li>Or <strong>labels</strong> and <strong>complete</strong>: Comma-separated labels for multi-class annotations</li>
-                  <li><strong>comments</strong>: Text comments (optional)</li>
-                </ul>
-                <p>Choose between binary review (yes/no/unsure) or multi-class review modes.</p>
-
-                {/* Load CSV Button */}
-                <div className="placeholder-actions">
-                  <button
-                    onClick={handleLoadAnnotationTask}
-                    disabled={loading}
-                    className="primary-button load-csv-button"
-                  >
-                    {loading ? 'Loading...' : 'Load Annotation CSV'}
-                  </button>
-                  <p className="load-button-help">
-                    <small>You can also use the menu button in the top-left to access loading and filtering options.</small>
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
+      {/* Status Bar - Always visible when data is loaded */}
+      {annotationData.length > 0 && (
+        <div className="review-status-bar">
+          <div className="status-section">
+            <span className="status-label">Current Page:</span>
+            <span className="status-value">{currentPage + 1} of {totalPages}</span>
+          </div>
+          <div className="status-section">
+            <span className="status-label">Annotated:</span>
+            <span className="status-value">
+              {annotationData.filter(item =>
+                settings.review_mode === 'binary'
+                  ? item.annotation && item.annotation !== ''
+                  : item.annotation_status === 'complete'
+              ).length} of {annotationData.length}
+            </span>
+          </div>
+          <div className="status-section">
+            <span className="status-label">Progress:</span>
+            <span className="status-value">
+              {Math.round((annotationData.filter(item =>
+                settings.review_mode === 'binary'
+                  ? item.annotation && item.annotation !== ''
+                  : item.annotation_status === 'complete'
+              ).length / annotationData.length) * 100)}%
+            </span>
+          </div>
+          {isFocusMode && (
+            <div className="status-section">
+              <span className="status-label">Focus:</span>
+              <span className="status-value">{focusClipIndex + 1} of {filteredAnnotationData.length}</span>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

@@ -33,8 +33,7 @@ function App() {
   const models = {
     'HawkEars': 'HawkEars Canadian bird classification CNN v0.1.0 (PyTorch)',
     'RanaSierraeCNN': 'CNN trained to detect Rana sierrae calls (PyTorch)',
-    'BirdNET': 'BirdNET Global species classifier v2.4 (TF Lite)',
-    // maybe exclude BirdNET for windows: ...(process.platform !== 'win32' && { 'BirdNET': 'BirdNET Global species classifier v2.4 (TF Lite)' }),
+    // TensorFlow-dependent models excluded for distribution build: BirdNET, Perch, SeparationModel
     'BirdSetConvNeXT': 'BirdSet: ConvNext Global Bird Song Classification Model (PyTorch)',
     'BirdSetBirdSetEfficientNetB1': 'BirdSet: EfficientNetB1 Global Bird Song Classification Model (PyTorch)',
   };
@@ -240,10 +239,6 @@ function App() {
 
   return (
     <div className="App">
-      <header className="App-header">
-        <h1>Bioacoustics Training GUI</h1>
-      </header>
-
       <nav className="tab-nav">
         {tabs.map(tab => (
           <button

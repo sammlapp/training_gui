@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef, memo } from 'react';
 import Select from 'react-select';
-import { useRenderProfiler } from './PerformanceProfiler';
+// import { useRenderProfiler } from './PerformanceProfiler';
 
 const AnnotationCard = memo(function AnnotationCard({
   clipData,
@@ -17,14 +17,15 @@ const AnnotationCard = memo(function AnnotationCard({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [spectrogramUrl, setSpectrogramUrl] = useState(null);
-  const [rootAudioPath, setRootAudioPath] = useState('');
   const [audioUrl, setAudioUrl] = useState(null);
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const audioRef = useRef(null);
+  const loadingRef = useRef(false);
+  const lastLoadedRef = useRef(null);
 
   // Add render profiling
-  useRenderProfiler('AnnotationCard');
+  // useRenderProfiler('AnnotationCard');
 
   const {
     file = '',
@@ -93,7 +94,8 @@ const AnnotationCard = memo(function AnnotationCard({
   // Parse annotation based on review mode
   const getAnnotationValue = () => {
     if (reviewMode === 'binary') {
-      return annotation || 'unlabeled';
+      // Return the actual annotation value, or null for unlabeled
+      return annotation || null;
     } else {
       // Multi-class: use labels column instead of annotation column
       const labelsToUse = labels || '';
@@ -122,25 +124,6 @@ const AnnotationCard = memo(function AnnotationCard({
     { value: 'unreviewed', label: 'Unreviewed', symbol: 'radio_button_unchecked', color: 'rgb(223, 223, 223)' }
   ];
 
-  // Load root audio path from settings
-  useEffect(() => {
-    const savedSettings = localStorage.getItem('review_settings');
-    if (savedSettings) {
-      try {
-        const parsed = JSON.parse(savedSettings);
-        setRootAudioPath(parsed.root_audio_path || '');
-      } catch (e) {
-        console.warn('Failed to parse root audio path from settings:', e);
-      }
-    }
-  }, []);
-
-  // Auto-load spectrogram when component mounts (unless disabled)
-  useEffect(() => {
-    if (!disableAutoLoad && file && start_time !== undefined && !spectrogramUrl && !spectrogram_base64 && !isLoading) {
-      loadSpectrogram();
-    }
-  }, [file, start_time, spectrogramUrl, spectrogram_base64, isLoading, disableAutoLoad]);
 
   // Cleanup effect to prevent memory leaks
   useEffect(() => {
@@ -156,7 +139,7 @@ const AnnotationCard = memo(function AnnotationCard({
   const binaryOptions = [
     { value: 'yes', label: 'Yes', symbol: 'check_circle', color: 'rgb(145, 180, 135)' },
     { value: 'no', label: 'No', symbol: 'cancel', color: 'rgb(207, 122, 107)' },
-    { value: 'unsure', label: 'Unsure', symbol: 'question_mark', color: 'rgb(237, 223, 177)' },
+    { value: 'uncertain', label: 'Uncertain', symbol: 'question_mark', color: 'rgb(237, 223, 177)' },
     { value: 'unlabeled', label: 'Reset', symbol: 'restart_alt', color: 'rgb(223, 223, 223)' }
   ];
 
@@ -192,7 +175,8 @@ const AnnotationCard = memo(function AnnotationCard({
 
   const handleBinaryAnnotationChange = useCallback((value) => {
     if (onAnnotationChange) {
-      onAnnotationChange(value === 'unlabeled' ? '' : value);
+      // For unlabeled, pass null to represent NaN in dataframe
+      onAnnotationChange(value === 'unlabeled' ? null : value);
     }
   }, [onAnnotationChange]);
 
@@ -221,7 +205,7 @@ const AnnotationCard = memo(function AnnotationCard({
   // Local state for comment to prevent re-renders on every keystroke
   const [localComment, setLocalComment] = useState(comments || '');
   const commentTimeoutRef = useRef(null);
-  
+
   // Update local comment when external comments change
   useEffect(() => {
     setLocalComment(comments || '');
@@ -230,19 +214,19 @@ const AnnotationCard = memo(function AnnotationCard({
   const handleCommentChange = (event) => {
     const newComment = event.target.value;
     setLocalComment(newComment);
-    
+
     // Debounce the callback to parent to prevent excessive re-renders
     if (commentTimeoutRef.current) {
       clearTimeout(commentTimeoutRef.current);
     }
-    
+
     commentTimeoutRef.current = setTimeout(() => {
       if (onCommentChange) {
         onCommentChange(newComment);
       }
     }, 500); // Wait 500ms after user stops typing
   };
-  
+
   // Clean up timeout on unmount
   useEffect(() => {
     return () => {
@@ -252,65 +236,84 @@ const AnnotationCard = memo(function AnnotationCard({
     };
   }, []);
 
-  const loadSpectrogram = async () => {
-    if (isLoading || spectrogramUrl || spectrogram_base64) return;
 
-    try {
-      setIsLoading(true);
-      setError('');
+  // Auto-load spectrogram when props change (proper implementation)
+  useEffect(() => {
+    const currentKey = `${file}:${start_time}`;
+    
+    // Only proceed if we should auto-load and haven't tried this combination before
+    if (!disableAutoLoad && file && start_time !== undefined && 
+        lastLoadedRef.current !== currentKey && !spectrogram_base64) {
+      
+      lastLoadedRef.current = currentKey;
+      
+      // Create an async function inside useEffect to handle the loading
+      const loadSpec = async () => {
+        if (loadingRef.current) return;
 
-      // Get visualization settings
-      const savedSettings = localStorage.getItem('visualization_settings');
-      const settings = savedSettings ? JSON.parse(savedSettings) : {
-        spec_window_size: 512,
-        spectrogram_colormap: 'greys_r',
-        dB_range: [-80, -20],
-        use_bandpass: false,
-        bandpass_range: [500, 8000],
-        show_reference_frequency: false,
-        reference_frequency: 1000,
-        resize_images: true,
-        image_width: 224,
-        image_height: 224,
+        try {
+          loadingRef.current = true;
+          setIsLoading(true);
+          setError('');
+
+          // Get visualization settings
+          const savedSettings = localStorage.getItem('visualization_settings');
+          const settings = savedSettings ? JSON.parse(savedSettings) : {
+            spec_window_size: 512,
+            spectrogram_colormap: 'greys_r',
+            dB_range: [-80, -20],
+            use_bandpass: false,
+            bandpass_range: [500, 8000],
+            show_reference_frequency: false,
+            reference_frequency: 1000,
+            resize_images: true,
+            image_width: 224,
+            image_height: 224,
+          };
+
+          if (window.electronAPI && file && start_time !== undefined) {
+            const clipEndTime = end_time || start_time + 3;
+
+            // Get current root audio path from localStorage
+            const reviewSettings = localStorage.getItem('review_settings');
+            const currentRootAudioPath = reviewSettings ? JSON.parse(reviewSettings).root_audio_path || '' : '';
+            
+            let fullFilePath = file;
+            if (currentRootAudioPath && !file.startsWith('/') && !file.match(/^[A-Za-z]:\\/)) {
+              fullFilePath = `${currentRootAudioPath}/${file}`;
+            }
+
+            console.log('Loading spectrogram for:', fullFilePath, 'from', start_time, 'to', clipEndTime);
+
+            const result = await window.electronAPI.createAudioClips(
+              fullFilePath,
+              start_time,
+              clipEndTime,
+              settings
+            );
+
+            console.log('Spectrogram result:', result);
+
+            if (result.status === 'success' && result.spectrogram_base64) {
+              const dataUrl = `data:image/png;base64,${result.spectrogram_base64}`;
+              setSpectrogramUrl(dataUrl);
+            } else {
+              setError(result.error || 'Failed to generate spectrogram');
+            }
+          } else {
+            setError('Missing file path or Electron API not available');
+          }
+        } catch (err) {
+          setError(`Failed to load spectrogram: ${err.message}`);
+        } finally {
+          loadingRef.current = false;
+          setIsLoading(false);
+        }
       };
 
-      if (window.electronAPI && file && start_time !== undefined) {
-        const clipEndTime = end_time || start_time + 3; // Default 3 second clip
-
-        // Construct full file path using root audio path if available
-        let fullFilePath = file;
-        if (rootAudioPath && !file.startsWith('/') && !file.match(/^[A-Za-z]:\\/)) {
-          // File is relative, prepend root audio path
-          fullFilePath = `${rootAudioPath}/${file}`;
-        }
-
-        console.log('Loading spectrogram for:', fullFilePath, 'from', start_time, 'to', clipEndTime);
-
-        const result = await window.electronAPI.createAudioClips(
-          fullFilePath,
-          start_time,
-          clipEndTime,
-          settings
-        );
-
-        console.log('Spectrogram result:', result);
-
-        if (result.status === 'success' && result.spectrogram_base64) {
-          const dataUrl = `data:image/png;base64,${result.spectrogram_base64}`;
-          setSpectrogramUrl(dataUrl);
-        } else {
-          setError(result.error || 'Failed to generate spectrogram');
-        }
-      } else {
-        setError('Missing file path or Electron API not available');
-      }
-    } catch (err) {
-      setError(`Failed to load spectrogram: ${err.message}`);
-    } finally {
-      setIsLoading(false);
+      loadSpec();
     }
-  };
-
+  }, [file, start_time, end_time, disableAutoLoad]);
 
   // Memoize spectrogram rendering to prevent re-renders when annotation changes
   const spectrogramMemo = useMemo(() => {
@@ -378,21 +381,29 @@ const AnnotationCard = memo(function AnnotationCard({
       return (
         <div className="binary-annotation-control">
           <div className="segmented-control">
-            {binaryOptions.map(option => (
-              <button
-                key={option.value}
-                className={`segment ${annotationValue === option.value ? 'active' : ''}`}
-                style={{
-                  backgroundColor: annotationValue === option.value ? option.color : 'transparent',
-                  borderColor: option.color,
-                  color: annotationValue === option.value ? 'white' : option.color
-                }}
-                onClick={() => handleBinaryAnnotationChange(option.value)}
-                title={option.label}
-              >
-                <span className="material-symbols-outlined">{option.symbol}</span>
-              </button>
-            ))}
+            {binaryOptions.map(option => {
+              // For unlabeled button, show as active only when explicitly unlabeled
+              // For other buttons, show as active when annotation matches
+              const isActive = option.value === 'unlabeled' 
+                ? false  // Never show unlabeled as active - it just resets
+                : annotationValue === option.value;
+              
+              return (
+                <button
+                  key={option.value}
+                  className={`segment ${isActive ? 'active' : ''}`}
+                  style={{
+                    backgroundColor: isActive ? option.color : 'transparent',
+                    borderColor: option.color,
+                    color: isActive ? 'white' : option.color
+                  }}
+                  onClick={() => handleBinaryAnnotationChange(option.value)}
+                  title={option.label}
+                >
+                  <span className="material-symbols-outlined">{option.symbol}</span>
+                </button>
+              );
+            })}
           </div>
         </div>
       );

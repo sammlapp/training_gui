@@ -53,9 +53,9 @@ def test_imports():
         results['bioacoustics_model_zoo'] = "✓ Available"
         logger.info("Bioacoustics Model Zoo: Available")
         
-        # Test available models
+        # Test available models (excluding TensorFlow-dependent ones)
         models = []
-        for model_name in ['BirdNET', 'Perch', 'HawkEars', 'RanaSierraeCNN']:
+        for model_name in ['HawkEars', 'RanaSierraeCNN']:
             try:
                 if hasattr(bmz, model_name):
                     models.append(model_name)

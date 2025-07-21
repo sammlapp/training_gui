@@ -32,10 +32,9 @@ import {
 } from '@mui/icons-material';
 
 const AVAILABLE_MODELS = {
-  'BirdNET': 'Global bird species classification (TensorFlow)',
-  'Perch': 'Global bird species classification (TensorFlow)',
   'HawkEars': 'HawkEars Canadian bird classification CNN v0.1.0 (PyTorch)',
   'RanaSierraeCNN': 'CNN trained to detect Rana sierrae calls (PyTorch)',
+  // Note: BirdNET, Perch, and SeparationModel are excluded as they require TensorFlow
 };
 
 function InferenceTab({ config, updateConfig }) {

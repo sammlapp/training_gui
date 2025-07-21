@@ -11,8 +11,89 @@ import sys
 import os
 import tempfile
 from pathlib import Path
-from opensoundscape import Audio, Spectrogram
-import matplotlib.pyplot as plt
+import librosa
+import soundfile as sf
+from PIL import Image
+import scipy.signal
+from io import BytesIO
+import base64
+
+def spec_to_image(spectrogram, range=[-80, -20], colormap='greys_r', channels=3, shape=None):
+    """Convert spectrogram to image array"""
+    # Normalize to range
+    spec_normalized = np.clip((spectrogram - range[0]) / (range[1] - range[0]), 0, 1)
+    
+    # Convert to 0-255 range
+    spec_uint8 = (spec_normalized * 255).astype(np.uint8)
+    
+    # Flip vertically (frequency axis)
+    spec_uint8 = np.flipud(spec_uint8)
+    
+    if channels == 3:
+        # Convert to RGB by repeating grayscale values
+        img_array = np.stack([spec_uint8, spec_uint8, spec_uint8], axis=-1)
+    else:
+        img_array = spec_uint8
+    
+    # Resize if shape specified
+    if shape is not None:
+        img = Image.fromarray(img_array)
+        img = img.resize((shape[1], shape[0]), Image.Resampling.LANCZOS)
+        img_array = np.array(img)
+    
+    return img_array
+
+def create_spectrogram_for_detection(file_path, start_time, end_time):
+    """Create spectrogram using librosa and PIL instead of opensoundscape"""
+    try:
+        # Load audio segment
+        duration = end_time - start_time if end_time > start_time else None
+        offset = start_time if start_time > 0 else 0
+        
+        samples, sr = librosa.load(file_path, sr=None, offset=offset, duration=duration)
+        
+        # Normalize audio
+        if len(samples) > 0:
+            samples = samples / (np.max(np.abs(samples)) + 1e-8)
+        
+        # Create spectrogram
+        frequencies, times, spectrogram = scipy.signal.spectrogram(
+            x=samples,
+            fs=sr,
+            nperseg=512,
+            noverlap=256,  # 50% overlap
+            nfft=512,
+        )
+        
+        # Convert to decibels
+        spectrogram = 10 * np.log10(
+            spectrogram,
+            where=spectrogram > 0,
+            out=np.full(spectrogram.shape, -np.inf),
+        )
+        
+        # Convert spectrogram to image array
+        img_array = spec_to_image(
+            spectrogram,
+            range=[-80, -20],
+            colormap='greys_r',
+            channels=3,
+            shape=(224, 224)
+        )
+        
+        # Convert to PIL Image and save to temporary file
+        pil_image = Image.fromarray(img_array, mode='RGB')
+        
+        # Save to temporary file
+        temp_dir = tempfile.gettempdir()
+        temp_file = os.path.join(temp_dir, f"spec_{hash(file_path + str(start_time))}.png")
+        pil_image.save(temp_file)
+        
+        return temp_file
+        
+    except Exception as e:
+        print(f"Error creating spectrogram for {file_path}: {e}")
+        return None
 
 def get_sample_detections(score_data, species, score_range, num_samples=12):
     """Get sample detections for a species within score range"""
@@ -45,30 +126,18 @@ def get_sample_detections(score_data, species, score_range, num_samples=12):
         # Generate spectrograms for each sample
         for detection in sample_detections:
             try:
-                # Create spectrogram
+                # Create spectrogram using librosa and PIL
                 audio_path = detection['file_path']
                 start_time = detection['start_time']
                 end_time = detection['end_time']
                 
-                # Load audio segment
+                # Handle full file case
                 if start_time == 0 and end_time == 0:
-                    # Full file
-                    audio = Audio.from_file(audio_path)
-                else:
-                    # Specific segment
-                    duration = end_time - start_time
-                    audio = Audio.from_file(audio_path, offset=start_time, duration=duration)
+                    # For full file, we'll load a segment from the beginning
+                    end_time = start_time + 5.0  # 5 second segment
                 
                 # Create spectrogram
-                spectrogram = Spectrogram.from_audio(audio)
-                
-                # Convert to image
-                img = spectrogram.to_image(range=[-80, -20], invert=True)
-                
-                # Save to temporary file
-                temp_dir = tempfile.gettempdir()
-                temp_file = os.path.join(temp_dir, f"spec_{detection['index']}.png")
-                img.save(temp_file)
+                temp_file = create_spectrogram_for_detection(audio_path, start_time, end_time)
                 
                 # Add info to detection
                 detection['spectrogram_path'] = temp_file
