@@ -322,24 +322,35 @@ consolidate the global theming options into a simple config or css file, so that
 ## conda-pack updates:
 - if on linux or mac, include ai-edge-litert as a dependency and allow BirdNET use in the inference gui
 
-inference issue: birdset model not producing outputs if clips are <5 seconds
+inference issue: BirdSet model not producing outputs if clips are <5 seconds
 
 ## inference tab updates:
 - app should download the appropriate env for inference if needed. tell user its downloading and will be saved for future use
 
-- if selecting all files in a folder, config file should contain the folder path rather than a list of all audio files. inference.py will need to handle globbing the files based on the config. 
 - checkbox for 'Save separate outputs per subfolder'. 
 
 ## inference tab updates:
-- re-add option to select an entire folder and recursively search for audio files within the folder. In this case, the config file should contain the globbing pattern rather than the entire list of files. The inference script should then glob to find the files. The lightweight python backend should also perform the globbing just to check and report the number of files that will be included. 
-- add a third option for specifying files: manually writing the globbing pattern. Click 'apply' to perform the glob on the lightweight backend and report the number of files located. 
 
-## feature request: create review task after inference
-
-
-future items:
+### wish list
+for completed tasks, add buttons to
+- open results in Explore tab
+- create annotation task (we need to implement a wizard/panel for this)
 - subset classes: can use text file or ebird filter
 - optional sparse outputs: don't save scores below a floor, and save df as a sparse pickle
+
+
+Inference settings panel: 
+- remove "saved" and "loaded" alerts after save/load of json config. Instead just put a message in the status bar. 
+
+option to split up inference tasks into one task per subfolder
+
+Inference Task Management:
+- Add button next to the section title to clear history (clears completed/failed/canceled tasks)
+- bug: "Currently Running" area still shows the most recent task after it completes
+- Canceled tasks are disappearing but should remain in the task tracker. 
+- Canceled tasks should have the 'Retry' button like failed tasks
+- Bug in task title # files reported: title line of each task panel reports "0 Files" if globbing patterns, file list document, or folder is used for file selection. The status bar also shows the same text with "0 Files". The file selection panel is correctly reporting the number of files located, and the inference is running properly on those files, so we just need to correctly pass the computed number of files to the inference panel. If this requires adding complexity to the current setup, simply remove the "0 Files" text from the header. 
+- Duration bug: Running time of Currently Running task restarts with app restart, but should be calculated from the task start time
 
 - TODO: how to divide up inference task? by subfolders? aggregate results or keep separate?
 - TODO: better progress reporting, currently goes from 0-100 instantly

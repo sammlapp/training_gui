@@ -333,6 +333,17 @@ ipcMain.handle('select-csv-files', async () => {
   return result.filePaths;
 });
 
+ipcMain.handle('select-text-files', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    properties: ['openFile'],
+    filters: [
+      { name: 'Text Files', extensions: ['txt', 'csv'] },
+      { name: 'All Files', extensions: ['*'] }
+    ]
+  });
+  return result.filePaths;
+});
+
 ipcMain.handle('select-json-files', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
     properties: ['openFile'],

@@ -183,6 +183,8 @@ class TaskManager {
       const configData = {
         model: config.model || 'BirdNET',
         files: config.files || [],
+        file_globbing_patterns: config.file_globbing_patterns || [],
+        file_list: config.file_list || '',
         output_file: outputCsvPath,
         job_folder: jobFolder,
         config_output_path: configJsonPath,
@@ -227,7 +229,7 @@ class TaskManager {
       // Update progress
       this.updateTask(task.id, { progress: 'Running inference...' });
 
-      // Run inference via HTTP API
+      // Start inference via HTTP API (now returns immediately with job ID)
       const inferenceResponse = await fetch('http://localhost:8000/inference/run', {
         method: 'POST',
         headers: {
@@ -236,40 +238,94 @@ class TaskManager {
         body: JSON.stringify({
           config_path: tempConfigPath,
           env_path: envPath,
-          archive_path: archivePath
+          archive_path: archivePath,
+          job_id: processId
         })
       });
 
-      const inferenceResult = await inferenceResponse.json();
+      const startResult = await inferenceResponse.json();
 
-      if (inferenceResult.status === 'success') {
-        return {
-          success: true,
-          output_path: configData.output_file,
-          job_folder: configData.job_folder,
-          config_path: configData.config_output_path,
-          total_files: config.files.length,
-          message: 'Inference completed successfully'
-        };
+      if (startResult.status === 'started') {
+        const jobId = startResult.job_id;
+        this.updateTask(task.id, { progress: 'Inference running...', processId: jobId });
+
+        // Poll for completion
+        const finalResult = await this.pollInferenceStatus(jobId, task.id);
+        
+        if (finalResult.status === 'completed') {
+          return {
+            success: true,
+            output_path: configData.output_file,
+            job_folder: configData.job_folder,
+            config_path: configData.config_output_path,
+            total_files: config.files.length || config.file_globbing_patterns.length || (config.file_list ? 1 : 0),
+            message: 'Inference completed successfully',
+            job_id: jobId
+          };
+        } else {
+          // Show detailed error information
+          let errorMessage = finalResult.error || 'Inference failed';
+
+          if (finalResult.stderr) {
+            errorMessage += '\n\nError output:\n' + finalResult.stderr;
+          }
+
+          if (finalResult.stdout) {
+            errorMessage += '\n\nStandard output:\n' + finalResult.stdout;
+          }
+
+          throw new Error(errorMessage);
+        }
       } else {
-        // Show detailed error information
-        let errorMessage = inferenceResult.error || 'Inference failed';
-
-        if (inferenceResult.details) {
-          errorMessage += '\n\nDetails:\n' + inferenceResult.details;
-        } else if (inferenceResult.stderr) {
-          errorMessage += '\n\nError output:\n' + inferenceResult.stderr;
-        }
-
-        if (inferenceResult.stdout) {
-          errorMessage += '\n\nStandard output:\n' + inferenceResult.stdout;
-        }
-
-        throw new Error(errorMessage);
+        throw new Error(startResult.error || 'Failed to start inference');
       }
     } catch (error) {
       throw new Error(`Inference failed: ${error.message}`);
     }
+  }
+
+  async pollInferenceStatus(jobId, taskId, pollInterval = 2000) {
+    /**
+     * Poll inference status until completion or failure
+     * @param {string} jobId - Backend job ID 
+     * @param {string} taskId - Frontend task ID
+     * @param {number} pollInterval - Polling interval in milliseconds
+     * @returns {Promise} Final result when inference completes
+     */
+    return new Promise((resolve, reject) => {
+      const poll = async () => {
+        try {
+          const response = await fetch(`http://localhost:8000/inference/status/${jobId}`);
+          
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+          
+          const result = await response.json();
+          
+          // Update task progress based on status
+          if (result.status === 'running') {
+            this.updateTask(taskId, { progress: 'Inference running...' });
+            // Continue polling
+            setTimeout(poll, pollInterval);
+          } else if (result.status === 'completed') {
+            this.updateTask(taskId, { progress: 'Inference completed' });
+            resolve(result);
+          } else if (result.status === 'failed') {
+            this.updateTask(taskId, { progress: 'Inference failed' });
+            resolve(result); // Resolve with failed status, let caller handle error
+          } else {
+            // Unknown status, treat as error
+            reject(new Error(`Unknown inference status: ${result.status}`));
+          }
+        } catch (error) {
+          reject(new Error(`Failed to check inference status: ${error.message}`));
+        }
+      };
+      
+      // Start polling
+      poll();
+    });
   }
 
   cancelTask(taskId) {

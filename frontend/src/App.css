@@ -491,6 +491,65 @@ small {
   margin: 0;
 }
 
+/* Extension Selection */
+.extension-selection {
+  margin-bottom: 16px;
+  padding: 12px;
+  background-color: var(--light-gray);
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
+.extension-selection label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+  color: var(--dark);
+}
+
+.extension-checkboxes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.extension-checkbox {
+  display: flex !important;
+  align-items: center;
+  gap: 6px;
+  margin: 0 !important;
+  padding: 6px 10px;
+  background-color: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.extension-checkbox:hover {
+  background-color: var(--hover-bg);
+  border-color: var(--accent);
+}
+
+.extension-checkbox input[type="checkbox"] {
+  margin: 0;
+  cursor: pointer;
+}
+
+.extension-label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--dark);
+  cursor: pointer;
+}
+
+.extension-description {
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--medium-gray);
+  margin-left: 4px;
+}
+
 /* HTTP Server Status */
 .http-server-status {
   margin: 16px 0;
@@ -4612,4 +4671,77 @@ button:disabled {
 /* Adjust main content to account for status bar */
 .main-content {
   padding-bottom: 50px;
+}
+
+/* Segmented Control */
+.segmented-control {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+
+.segment {
+  flex: 1;
+  padding: 8px 12px;
+  background: var(--white);
+  border: none;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  border-right: 1px solid var(--border);
+}
+
+.segment:last-child {
+  border-right: none;
+}
+
+.segment:hover {
+  background: var(--light-gray);
+}
+
+.segment.active {
+  background: var(--dark-accent);
+  color: var(--white);
+}
+
+.segment.active:hover {
+  background: var(--dark);
+}
+
+/* File Selection Content */
+.file-selection-content {
+  margin-top: 12px;
+}
+
+.glob-patterns textarea {
+  font-family: monospace;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 8px;
+  font-size: 0.8rem;
+  resize: vertical;
+}
+
+.glob-patterns textarea:focus {
+  outline: none;
+  border-color: var(--dark-accent);
+  box-shadow: 0 0 0 2px rgba(79, 93, 117, 0.1);
+}
+
+.pattern-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.total-file-count {
+  margin-top: 8px;
+  padding: 6px 12px;
+  background: var(--light-gray);
+  border-radius: 4px;
+  font-size: 0.8rem;
+  color: var(--dark);
+  text-align: center;
 }

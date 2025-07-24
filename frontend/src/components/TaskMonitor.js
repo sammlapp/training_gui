@@ -140,7 +140,12 @@ function TaskMonitor({ taskManager }) {
 
               <div className="task-details">
                 <div className="task-config">
-                  Model: {task.config.model} • Files: {task.config.files?.length || 0}
+                  Model: {task.config.model} • Files: {
+                    task.config.files?.length || 
+                    (task.config.file_globbing_patterns?.length ? 'Pattern-based' : '') ||
+                    (task.config.file_list ? 'List-based' : '') ||
+                    0
+                  }
                 </div>
 
                 {task.progress && (

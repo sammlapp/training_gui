@@ -15,6 +15,7 @@ import base64
 import subprocess
 import threading
 import tarfile
+import glob
 from pathlib import Path
 from aiohttp import web, web_request
 from aiohttp_cors import setup as cors_setup, ResourceOptions
@@ -177,14 +178,14 @@ def setup_environment(env_dir, archive_path=None):
 
 
 # Process Management Functions
-def run_inference_with_env(config_path, env_python_path):
-    """Run inference using specified Python environment"""
+def start_inference_process(job_id, config_path, env_python_path):
+    """Start inference process in background and return immediately"""
     try:
         # Resolve paths to absolute paths
         config_path = resolve_path(config_path)
         env_python_path = resolve_path(env_python_path)
         
-        logger.info(f"Running inference with config: {config_path}")
+        logger.info(f"Starting inference job {job_id} with config: {config_path}")
         logger.info(f"Using Python environment: {env_python_path}")
         
         # Verify environment exists
@@ -201,7 +202,7 @@ def run_inference_with_env(config_path, env_python_path):
         
         logger.info(f"Running command: {' '.join(cmd)}")
         
-        # Start the process
+        # Start the process (non-blocking)
         process = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
@@ -210,35 +211,60 @@ def run_inference_with_env(config_path, env_python_path):
             cwd=os.path.dirname(os.path.abspath(__file__))
         )
         
-        # Wait for process to complete
-        stdout, stderr = process.communicate()
-        return_code = process.returncode
+        return {
+            "status": "started",
+            "job_id": job_id,
+            "process": process,
+            "command": " ".join(cmd),
+            "message": "Inference process started successfully"
+        }
+            
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
+def check_inference_status(process):
+    """Check status of running inference process"""
+    try:
+        if process is None:
+            return {"status": "error", "error": "No process to check"}
         
-        logger.info(f"Inference process completed with exit code: {return_code}")
-        if stdout:
-            logger.info(f"Stdout: {stdout[:500]}...")  # Log first 500 chars
-        if stderr:
-            logger.error(f"Stderr: {stderr[:500]}...")  # Log first 500 chars
+        # Check if process is still running
+        return_code = process.poll()
         
-        if return_code == 0:
+        if return_code is None:
+            # Process is still running
             return {
-                "status": "success", 
-                "message": "Inference completed successfully", 
-                "output": stdout,
-                "stdout": stdout,
-                "stderr": stderr if stderr else ""
+                "status": "running",
+                "message": "Inference process is still running"
             }
         else:
-            return {
-                "status": "error", 
-                "error": f"Inference failed with exit code {return_code}", 
-                "exit_code": return_code,
-                "stdout": stdout if stdout else "",
-                "stderr": stderr if stderr else "",
-                "command": " ".join(cmd),
-                "details": f"Command: {' '.join(cmd)}\nExit Code: {return_code}\nStdout: {stdout}\nStderr: {stderr}"
-            }
+            # Process has completed, get output
+            stdout, stderr = process.communicate()
             
+            logger.info(f"Inference process completed with exit code: {return_code}")
+            if stdout:
+                logger.info(f"Stdout: {stdout[:500]}...")  # Log first 500 chars
+            if stderr:
+                logger.error(f"Stderr: {stderr[:500]}...")  # Log first 500 chars
+            
+            if return_code == 0:
+                return {
+                    "status": "completed", 
+                    "message": "Inference completed successfully", 
+                    "output": stdout,
+                    "stdout": stdout,
+                    "stderr": stderr if stderr else "",
+                    "exit_code": return_code
+                }
+            else:
+                return {
+                    "status": "failed", 
+                    "error": f"Inference failed with exit code {return_code}", 
+                    "exit_code": return_code,
+                    "stdout": stdout if stdout else "",
+                    "stderr": stderr if stderr else ""
+                }
+                
     except Exception as e:
         return {"status": "error", "error": str(e)}
 
@@ -396,6 +422,7 @@ class LightweightServer:
     def __init__(self, port=8000):
         self.port = port
         self.app = web.Application()
+        self.running_jobs = {}  # Track running inference jobs: {job_id: {process, task, status, result}}
         self.setup_routes()
         self.setup_cors()
 
@@ -435,6 +462,11 @@ class LightweightServer:
         self.app.router.add_post("/env/check", self.check_env)
         self.app.router.add_post("/env/setup", self.setup_env)
         self.app.router.add_post("/inference/run", self.run_inference)
+        self.app.router.add_get("/inference/status/{job_id}", self.get_inference_status)
+        
+        # File counting routes
+        self.app.router.add_post("/files/count-glob", self.count_files_glob)
+        self.app.router.add_post("/files/count-list", self.count_files_list)
 
     async def root_handler(self, request):
         """Root endpoint to handle HEAD requests from wait-on"""
@@ -696,14 +728,16 @@ class LightweightServer:
 
     # Process Management Routes
     async def run_inference(self, request):
-        """Run inference with conda-pack environment"""
+        """Start inference process and return immediately with job ID"""
         try:
             data = await request.json()
             config_path = data.get("config_path")
             env_path = data.get("env_path")
             archive_path = data.get("archive_path")
+            job_id = data.get("job_id", f"job_{int(asyncio.get_event_loop().time() * 1000)}")
             
             logger.info(f"Inference request received:")
+            logger.info(f"  job_id: {job_id}")
             logger.info(f"  config_path: {config_path}")
             logger.info(f"  env_path: {env_path}")
             logger.info(f"  archive_path: {archive_path}")
@@ -717,12 +751,166 @@ class LightweightServer:
                 logger.error(f"Environment setup failed: {env_result}")
                 return web.json_response(env_result, status=500)
             
-            # Run inference
-            result = run_inference_with_env(config_path, env_result["python_path"])
-            return web.json_response(result)
+            # Start inference process (non-blocking)
+            result = start_inference_process(job_id, config_path, env_result["python_path"])
+            
+            if result["status"] == "started":
+                # Store job info for status tracking
+                self.running_jobs[job_id] = {
+                    "process": result["process"],
+                    "status": "running",
+                    "job_id": job_id,
+                    "command": result["command"],
+                    "started_at": asyncio.get_event_loop().time()
+                }
+                
+                return web.json_response({
+                    "status": "started",
+                    "job_id": job_id,
+                    "message": "Inference started successfully. Use /inference/status/{job_id} to check progress."
+                })
+            else:
+                return web.json_response(result, status=500)
             
         except Exception as e:
-            logger.error(f"Error running inference: {e}")
+            logger.error(f"Error starting inference: {e}")
+            return web.json_response({"status": "error", "error": str(e)}, status=500)
+
+    async def get_inference_status(self, request):
+        """Get status of running inference job"""
+        try:
+            job_id = request.match_info['job_id']
+            
+            if job_id not in self.running_jobs:
+                return web.json_response({"status": "error", "error": f"Job {job_id} not found"}, status=404)
+            
+            job_info = self.running_jobs[job_id]
+            process = job_info["process"]
+            
+            # Check current status
+            status_result = check_inference_status(process)
+            
+            # Update job info
+            job_info["status"] = status_result["status"]
+            job_info["last_checked"] = asyncio.get_event_loop().time()
+            
+            # If completed or failed, add final results and optionally clean up
+            if status_result["status"] in ["completed", "failed"]:
+                job_info.update(status_result)
+                # Keep job info for a while so frontend can retrieve results
+                # Could add cleanup logic here if needed
+            
+            return web.json_response({
+                "job_id": job_id,
+                "started_at": job_info["started_at"],
+                "last_checked": job_info["last_checked"],
+                **status_result
+            })
+            
+        except Exception as e:
+            logger.error(f"Error checking inference status: {e}")
+            return web.json_response({"status": "error", "error": str(e)}, status=500)
+
+    async def count_files_glob(self, request):
+        """Count files matching glob patterns"""
+        try:
+            data = await request.json()
+            patterns = data.get("patterns", [])
+            extensions = data.get("extensions", ['wav', 'mp3', 'flac', 'ogg', 'm4a', 'aac'])  # Default extensions
+            
+            if not patterns:
+                return web.json_response({"status": "error", "error": "No patterns provided"}, status=400)
+            
+            logger.info(f"Counting files for patterns: {patterns}")
+            logger.info(f"Using extensions: {extensions}")
+            
+            # Convert extensions to valid set (both lower and uppercase)
+            valid_extensions = set()
+            for ext in extensions:
+                valid_extensions.add(f'.{ext.lower()}')
+                valid_extensions.add(f'.{ext.upper()}')
+            
+            all_files = set()  # Use set to avoid duplicates
+            
+            for pattern in patterns:
+                try:
+                    # Use glob with recursive=True to support ** syntax
+                    matches = glob.glob(pattern, recursive=True)
+                    
+                    # Filter for audio files only
+                    audio_files = [f for f in matches if Path(f).suffix in valid_extensions and os.path.isfile(f)]
+                    all_files.update(audio_files)
+                    
+                    logger.info(f"Pattern '{pattern}' matched {len(audio_files)} audio files")
+                    
+                except Exception as e:
+                    logger.warning(f"Error processing pattern '{pattern}': {e}")
+                    continue
+            
+            total_count = len(all_files)
+            logger.info(f"Total unique audio files found: {total_count}")
+            
+            return web.json_response({
+                "status": "success",
+                "count": total_count,
+                "patterns_processed": len(patterns),
+                "extensions_used": extensions
+            })
+            
+        except Exception as e:
+            logger.error(f"Error counting files from glob patterns: {e}")
+            return web.json_response({"status": "error", "error": str(e)}, status=500)
+
+    async def count_files_list(self, request):
+        """Count files from a file list (one file per line)"""
+        try:
+            data = await request.json()
+            file_path = data.get("file_path")
+            
+            if not file_path:
+                return web.json_response({"status": "error", "error": "No file_path provided"}, status=400)
+            
+            if not os.path.exists(file_path):
+                return web.json_response({"status": "error", "error": f"File list not found: {file_path}"}, status=400)
+            
+            logger.info(f"Counting files from list: {file_path}")
+            
+            # Valid audio extensions
+            valid_extensions = {'.wav', '.WAV', '.mp3', '.MP3', '.flac', '.FLAC', '.ogg', '.OGG', '.m4a', '.M4A', '.aac', '.AAC'}
+            
+            valid_files = []
+            invalid_files = []
+            
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    for line_num, line in enumerate(f, 1):
+                        file_path_line = line.strip()
+                        
+                        # Skip empty lines
+                        if not file_path_line:
+                            continue
+                        
+                        # Check if file exists and has valid extension
+                        if os.path.isfile(file_path_line) and Path(file_path_line).suffix in valid_extensions:
+                            valid_files.append(file_path_line)
+                        else:
+                            invalid_files.append(f"Line {line_num}: {file_path_line}")
+                            logger.warning(f"Invalid or missing file at line {line_num}: {file_path_line}")
+                
+                logger.info(f"File list processed: {len(valid_files)} valid, {len(invalid_files)} invalid")
+                
+                return web.json_response({
+                    "status": "success",
+                    "count": len(valid_files),
+                    "valid_files": len(valid_files),
+                    "invalid_files": len(invalid_files)
+                })
+                
+            except UnicodeDecodeError:
+                return web.json_response({"status": "error", "error": "File list contains invalid characters (not UTF-8)"}, status=400)
+            
+        except Exception as e:
+            logger.error(f"Error counting files from file list: {e}")
             return web.json_response({"status": "error", "error": str(e)}, status=500)
 
     async def start_server(self):

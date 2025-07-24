@@ -2,8 +2,29 @@ import React, { useState } from 'react';
 
 function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
   const [taskName, setTaskName] = useState('');
+  const [fileSelectionMode, setFileSelectionMode] = useState('files'); // 'files', 'folder', 'patterns', 'filelist'
+  const [globPatterns, setGlobPatterns] = useState('');
+  const [fileCount, setFileCount] = useState(0);
+
+  // Available audio extensions with their descriptions
+  const availableExtensions = [
+    { ext: 'wav', label: 'WAV', description: 'Uncompressed audio' },
+    { ext: 'mp3', label: 'MP3', description: 'Compressed audio' },
+    { ext: 'flac', label: 'FLAC', description: 'Lossless compressed' },
+    { ext: 'ogg', label: 'OGG', description: 'Open source compressed' },
+    { ext: 'm4a', label: 'M4A', description: 'Apple audio' },
+    { ext: 'aac', label: 'AAC', description: 'Advanced audio coding' },
+    { ext: 'wma', label: 'WMA', description: 'Windows media audio' },
+    { ext: 'aiff', label: 'AIFF', description: 'Apple interchange' }
+  ];
+
+  // Selected extensions (default to most common)
+  const [selectedExtensions, setSelectedExtensions] = useState(['wav', 'mp3', 'flac']);
+
   const [config, setConfig] = useState({
     files: [],
+    file_globbing_patterns: [],
+    file_list: '',
     model: 'BirdNET',
     overlap: 0.0,
     batch_size: 1,
@@ -11,14 +32,150 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
     output_dir: ''
   });
 
+  const handleExtensionChange = (ext, checked) => {
+    if (checked) {
+      setSelectedExtensions(prev => [...prev, ext]);
+    } else {
+      setSelectedExtensions(prev => prev.filter(e => e !== ext));
+    }
+  };
+
+  const generatePatternsForExtensions = (basePath, extensions) => {
+    return extensions.flatMap(ext => [
+      `${basePath}/**/*.${ext}`,
+      `${basePath}/**/*.${ext.toUpperCase()}`
+    ]);
+  };
+
   const handleFileSelection = async () => {
     try {
       const files = await window.electronAPI.selectFiles();
       if (files && files.length > 0) {
-        setConfig(prev => ({ ...prev, files }));
+        setConfig(prev => ({
+          ...prev,
+          files,
+          file_globbing_patterns: [],
+          file_list: ''
+        }));
+        setFileCount(files.length);
       }
     } catch (error) {
       console.error('Failed to select files:', error);
+    }
+  };
+
+  const handleFolderSelection = async () => {
+    try {
+      const folder = await window.electronAPI.selectFolder();
+      if (folder && selectedExtensions.length > 0) {
+        // Create globbing patterns for selected extensions
+        const patterns = generatePatternsForExtensions(folder, selectedExtensions);
+
+        setConfig(prev => ({
+          ...prev,
+          files: [],
+          file_globbing_patterns: patterns,
+          file_list: ''
+        }));
+
+        // Count files using backend
+        await countFilesFromPatterns(patterns);
+      } else if (folder && selectedExtensions.length === 0) {
+        alert('Please select at least one file extension to search for.');
+      }
+    } catch (error) {
+      console.error('Failed to select folder:', error);
+    }
+  };
+
+  const handleFileListSelection = async () => {
+    try {
+      const files = await window.electronAPI.selectTextFiles();
+      if (files && files.length > 0) {
+        const filePath = files[0]; // Should be a text file (.txt or .csv)
+        setConfig(prev => ({
+          ...prev,
+          files: [],
+          file_globbing_patterns: [],
+          file_list: filePath
+        }));
+
+        // Count files in the list using backend
+        await countFilesFromList(filePath);
+      }
+    } catch (error) {
+      console.error('Failed to select file list:', error);
+    }
+  };
+
+  const handlePatternChange = (e) => {
+    setGlobPatterns(e.target.value);
+  };
+
+  const handleFindFiles = async () => {
+    const patterns = globPatterns.split('\n').filter(p => p.trim()).map(p => p.trim());
+    if (patterns.length > 0) {
+      setConfig(prev => ({
+        ...prev,
+        files: [],
+        file_globbing_patterns: patterns,
+        file_list: ''
+      }));
+
+      await countFilesFromPatterns(patterns);
+    }
+  };
+
+  const countFilesFromPatterns = async (patterns) => {
+    try {
+      const response = await fetch('http://localhost:8000/files/count-glob', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          patterns,
+          extensions: selectedExtensions
+        })
+      });
+
+      const result = await response.json();
+      if (result.status === 'success') {
+        setFileCount(result.count);
+      } else {
+        console.error('Failed to count files:', result.error);
+        setFileCount(0);
+      }
+    } catch (error) {
+      console.error('Failed to count files:', error);
+      // Fallback: show estimated count message
+      setFileCount('? (Server not available)');
+      alert('Cannot count files - backend server not available. Files will be counted during inference.');
+    }
+  };
+
+  const countFilesFromList = async (filePath) => {
+    try {
+      const response = await fetch('http://localhost:8000/files/count-list', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ file_path: filePath })
+      });
+
+      const result = await response.json();
+      if (result.status === 'success') {
+        setFileCount(result.count);
+      } else {
+        console.error('Failed to count files:', result.error);
+        setFileCount(0);
+      }
+    } catch (error) {
+      console.error('Failed to count files:', error);
+      // Fallback: show estimated count message
+      setFileCount('? (Server not available)');
+      alert('Cannot count files - backend server not available. Files will be counted during inference.');
     }
   };
 
@@ -34,9 +191,25 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
   };
 
   const handleSubmit = (createAndRun = false) => {
-    if (config.files.length === 0) {
-      alert('Please select audio files first');
+    // Validate file selection based on mode
+    const hasFiles = config.files.length > 0 ||
+      config.file_globbing_patterns.length > 0 ||
+      config.file_list.trim() !== '';
+
+    if (!hasFiles) {
+      alert('Please select audio files, folder, patterns, or file list first');
       return;
+    }
+
+    if (fileCount === 0) {
+      alert('No audio files found with current selection');
+      return;
+    }
+
+    // Allow proceeding if server is not available (fileCount is string)
+    if (typeof fileCount === 'string') {
+      const proceed = confirm('File count could not be verified (server not available). Proceed anyway?');
+      if (!proceed) return;
     }
 
     if (!config.output_dir) {
@@ -55,9 +228,14 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
 
     // Reset form
     setTaskName('');
+    setGlobPatterns('');
+    setFileCount(0);
+    setSelectedExtensions(['wav', 'mp3', 'flac']); // Reset to defaults
     setConfig(prev => ({
       ...prev,
       files: [],
+      file_globbing_patterns: [],
+      file_list: '',
       output_dir: ''
     }));
   };
@@ -76,8 +254,13 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
       if (configPath) {
         const configData = {
           task_name: taskName,
+          file_selection_mode: fileSelectionMode,
+          selected_extensions: selectedExtensions,
           model: config.model,
           files: config.files,
+          file_globbing_patterns: config.file_globbing_patterns,
+          file_list: config.file_list,
+          glob_patterns_text: globPatterns,
           output_dir: config.output_dir,
           inference_settings: {
             clip_overlap: config.overlap,
@@ -134,15 +317,31 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
         if (result.status === 'success') {
           const configData = result.config;
           setTaskName(configData.task_name || '');
+          setFileSelectionMode(configData.file_selection_mode || 'files');
+          setGlobPatterns(configData.glob_patterns_text || '');
+          setSelectedExtensions(configData.selected_extensions || ['wav', 'mp3', 'flac']);
+
           setConfig(prev => ({
             ...prev,
             model: configData.model || 'BirdNET',
             files: configData.files || [],
+            file_globbing_patterns: configData.file_globbing_patterns || [],
+            file_list: configData.file_list || '',
             output_dir: configData.output_dir || '',
             overlap: configData.inference_settings?.clip_overlap || 0.0,
             batch_size: configData.inference_settings?.batch_size || 1,
             worker_count: configData.inference_settings?.num_workers || 1
           }));
+
+          // Update file count based on loaded config
+          if (configData.files && configData.files.length > 0) {
+            setFileCount(configData.files.length);
+          } else if (configData.file_globbing_patterns && configData.file_globbing_patterns.length > 0) {
+            await countFilesFromPatterns(configData.file_globbing_patterns);
+          } else if (configData.file_list) {
+            await countFilesFromList(configData.file_list);
+          }
+
           alert(`Config loaded from: ${configFile[0].split('/').pop()}`);
         } else {
           alert(`Failed to load config: ${result.error}`);
@@ -169,17 +368,149 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
           />
         </div>
 
-        {/* Files */}
+        {/* File Selection Mode */}
         <div className="form-group full-width">
-          <label>Audio Files</label>
-          <div className="file-selection">
-            <button onClick={handleFileSelection}>
-              Select Audio Files
+          <label>Audio File Selection</label>
+          <div className="segmented-control">
+            <button
+              type="button"
+              className={`segment ${fileSelectionMode === 'files' ? 'active' : ''}`}
+              onClick={() => setFileSelectionMode('files')}
+            >
+              Select Files
             </button>
-            {config.files.length > 0 && (
-              <span className="file-count">
-                {config.files.length} files selected
-              </span>
+            <button
+              type="button"
+              className={`segment ${fileSelectionMode === 'folder' ? 'active' : ''}`}
+              onClick={() => setFileSelectionMode('folder')}
+            >
+              Select Folder
+            </button>
+            <button
+              type="button"
+              className={`segment ${fileSelectionMode === 'patterns' ? 'active' : ''}`}
+              onClick={() => setFileSelectionMode('patterns')}
+            >
+              Glob Patterns
+            </button>
+            <button
+              type="button"
+              className={`segment ${fileSelectionMode === 'filelist' ? 'active' : ''}`}
+              onClick={() => setFileSelectionMode('filelist')}
+            >
+              File List
+            </button>
+          </div>
+
+          {/* Dynamic file selection UI based on mode */}
+          <div className="file-selection-content">
+            {fileSelectionMode === 'files' && (
+              <div className="file-selection">
+                <button onClick={handleFileSelection}>
+                  Select Audio Files
+                </button>
+                {config.files.length > 0 && (
+                  <span className="file-count">
+                    {config.files.length} files selected
+                  </span>
+                )}
+              </div>
+            )}
+
+            {fileSelectionMode === 'folder' && (
+              <div className="file-selection">
+                <div className="extension-selection">
+                  <label>File Extensions to Include:</label>
+                  <div className="extension-checkboxes">
+                    {availableExtensions.map(({ ext, label, description }) => (
+                      <label key={ext} className="extension-checkbox">
+                        <input
+                          type="checkbox"
+                          checked={selectedExtensions.includes(ext)}
+                          onChange={(e) => handleExtensionChange(ext, e.target.checked)}
+                        />
+                        <span className="extension-label">
+                          {label}
+                          <span className="extension-description">({description})</span>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <button onClick={handleFolderSelection}>
+                  Select Folder (Recursive)
+                </button>
+                {config.file_globbing_patterns.length > 0 && (
+                  <span className="file-count">
+                    Searching in folder - {fileCount} files found
+                  </span>
+                )}
+              </div>
+            )}
+
+            {fileSelectionMode === 'patterns' && (
+              <div className="glob-patterns">
+                <div className="extension-selection">
+                  <label>File Extensions to Include:</label>
+                  <div className="extension-checkboxes">
+                    {availableExtensions.map(({ ext, label, description }) => (
+                      <label key={ext} className="extension-checkbox">
+                        <input
+                          type="checkbox"
+                          checked={selectedExtensions.includes(ext)}
+                          onChange={(e) => handleExtensionChange(ext, e.target.checked)}
+                        />
+                        <span className="extension-label">
+                          {label}
+                          <span className="extension-description">({description})</span>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <textarea
+                  value={globPatterns}
+                  onChange={handlePatternChange}
+                  placeholder="/Users/name/data/project1/**/*.WAV&#10;/Users/name/data/project2/**/*.mp3&#10;/path/to/audio/**/*.{wav,mp3,flac}"
+                  rows={4}
+                  style={{ width: '100%', marginBottom: '8px' }}
+                />
+                <div className="pattern-actions">
+                  <button onClick={handleFindFiles}>
+                    Find Files
+                  </button>
+                  {config.file_globbing_patterns.length > 0 && (
+                    <span className="file-count">
+                      {fileCount} files found
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {fileSelectionMode === 'filelist' && (
+              <div className="file-selection">
+                <button onClick={handleFileListSelection}>
+                  Select Text File (One File Per Line)
+                </button>
+                {config.file_list && (
+                  <div>
+                    <span className="selected-path">
+                      {config.file_list.split('/').pop()}
+                    </span>
+                    <span className="file-count">
+                      {fileCount} files listed
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* File count display */}
+            {fileCount > 0 && (
+              <div className="total-file-count">
+                Total files: <strong>{fileCount}</strong>
+              </div>
             )}
           </div>
         </div>
@@ -277,7 +608,7 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
           <button
             className="button-secondary"
             onClick={() => handleSubmit(false)}
-            disabled={config.files.length === 0 || !config.output_dir}
+            disabled={(fileCount === 0) || !config.output_dir}
             style={{ fontSize: '0.8rem', padding: '6px 12px' }}
           >
             Create Task
@@ -285,7 +616,7 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
           <button
             className="button-primary"
             onClick={() => handleSubmit(true)}
-            disabled={config.files.length === 0 || !config.output_dir}
+            disabled={(fileCount === 0) || !config.output_dir}
             style={{ fontSize: '0.8rem', padding: '6px 12px' }}
 
           >
