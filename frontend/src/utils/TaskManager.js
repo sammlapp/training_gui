@@ -172,12 +172,20 @@ class TaskManager {
       // Update progress
       this.updateTask(task.id, { progress: 'Preparing configuration...' });
 
+      // Create job folder and output paths
+      const jobFolderName = task.name.replace(/[^a-zA-Z0-9\-_\s]/g, '').replace(/\s+/g, '_');
+      const jobFolder = config.output_dir ? `${config.output_dir}/${jobFolderName}` : '';
+      const outputCsvPath = jobFolder ? `${jobFolder}/predictions.csv` : '';
+      const configJsonPath = jobFolder ? `${jobFolder}/${task.name}_${task.id}.json` : '';
+
       // Create temporary config file
       const tempConfigPath = `/tmp/inference_config_${processId}.json`;
       const configData = {
         model: config.model || 'BirdNET',
         files: config.files || [],
-        output_file: config.output_dir ? `${config.output_dir}/predictions_${Date.now()}.csv` : '',
+        output_file: outputCsvPath,
+        job_folder: jobFolder,
+        config_output_path: configJsonPath,
         inference_settings: {
           clip_overlap: config.overlap || 0.0,
           batch_size: config.batch_size || 1,
@@ -238,6 +246,8 @@ class TaskManager {
         return {
           success: true,
           output_path: configData.output_file,
+          job_folder: configData.job_folder,
+          config_path: configData.config_output_path,
           total_files: config.files.length,
           message: 'Inference completed successfully'
         };

@@ -331,17 +331,11 @@ inference issue: birdset model not producing outputs if clips are <5 seconds
 - checkbox for 'Save separate outputs per subfolder'. 
 
 ## inference tab updates:
-- cannot select files: select files: TypeError: window.electronAPI.selectAudioFiles is not a function
-    at handleFileSelection (TaskCreationForm.js:19:1)
-- remove clip duration argument: clip duration is based on the selected model
-- remove threshold argument: the inference script saves continuous score outputs
+- re-add option to select an entire folder and recursively search for audio files within the folder. In this case, the config file should contain the globbing pattern rather than the entire list of files. The inference script should then glob to find the files. The lightweight python backend should also perform the globbing just to check and report the number of files that will be included. 
+- add a third option for specifying files: manually writing the globbing pattern. Click 'apply' to perform the glob on the lightweight backend and report the number of files located. 
 
-- refactor as "create inference tasks": when user selects settings and clicks 'create and run task' button, the task gets a name then launches background task and monitors progress in a pane that monitors each task. Alternatively can click 'create task' button to create but not start the inference task. API is not disabled when task begins: instead, user can create additional inference tasks that are queued to run after the running one is complete. We will need background task monitoring. Give each inference task a unique ID, and put this ID in the config json file name. A tasks pane monitors the status of inference tasks: completed, running, failed, queued, or unstarted. Buttons next to each task in the task pane allow users to:
-  - start unstarted tasks (run immediately if no task is running, otherwise add to queue)
-  - rerun completed / canceled / failed tasks 
-  - cancel a running task (interrupts / kills the background process)
-Make sure the task pane persists or re-loads appropriately if the user navigates to another tab and back, or even if the app completely restarts. Make a careful plan for how and where to store or fetch information about the status of inference tasks. 
-- instead of displaying messages in a div at the top of the page (like "Setting up ML environment and running inference..."), add a fixed-position status bar at the bottom of the window for displaying messages.
+## feature request: create review task after inference
+
 
 future items:
 - subset classes: can use text file or ebird filter

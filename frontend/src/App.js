@@ -20,22 +20,18 @@ function App() {
   // Set up task manager listeners
   useEffect(() => {
     const unsubscribe = taskManager.addListener((event, data) => {
-      if (event === 'taskUpdated' && data.status === 'running') {
-        setCurrentTask(data);
-      } else if (event === 'taskUpdated' && ['completed', 'failed', 'cancelled'].includes(data.status)) {
-        setCurrentTask(null);
-      }
-      
-      // Update task history
+      // Always update task history first
       setTaskHistory(taskManager.getAllTasks());
+      
+      // Update current task based on queue info
+      const queueInfo = taskManager.getQueueInfo();
+      setCurrentTask(queueInfo.currentTask);
     });
 
     // Initial load
     setTaskHistory(taskManager.getAllTasks());
     const queueInfo = taskManager.getQueueInfo();
-    if (queueInfo.currentTask) {
-      setCurrentTask(queueInfo.currentTask);
-    }
+    setCurrentTask(queueInfo.currentTask);
 
     return unsubscribe;
   }, []);

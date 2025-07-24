@@ -4,6 +4,7 @@ import { TASK_STATUS } from '../utils/TaskManager';
 function TaskMonitor({ taskManager }) {
   const [tasks, setTasks] = useState([]);
   const [queueInfo, setQueueInfo] = useState({ currentTask: null, queueLength: 0, nextTasks: [] });
+  const [expandedErrors, setExpandedErrors] = useState(new Set());
 
   useEffect(() => {
     if (!taskManager) return;
@@ -38,7 +39,7 @@ function TaskMonitor({ taskManager }) {
     const seconds = Math.floor(duration / 1000);
     const minutes = Math.floor(seconds / 60);
     const hours = Math.floor(minutes / 60);
-    
+
     if (hours > 0) {
       return `${hours}h ${minutes % 60}m ${seconds % 60}s`;
     } else if (minutes > 0) {
@@ -66,6 +67,16 @@ function TaskMonitor({ taskManager }) {
     }
   };
 
+  const toggleErrorExpansion = (taskId) => {
+    const newExpanded = new Set(expandedErrors);
+    if (newExpanded.has(taskId)) {
+      newExpanded.delete(taskId);
+    } else {
+      newExpanded.add(taskId);
+    }
+    setExpandedErrors(newExpanded);
+  };
+
   return (
     <div className="task-monitor">
       {/* Queue Status */}
@@ -83,7 +94,7 @@ function TaskMonitor({ taskManager }) {
             <div className="task-meta">
               Duration: {formatDuration(queueInfo.currentTask.started)}
             </div>
-            <button 
+            <button
               className="task-action cancel"
               onClick={() => handleCancelTask(queueInfo.currentTask.id)}
             >
@@ -103,7 +114,7 @@ function TaskMonitor({ taskManager }) {
                 <span className="queue-position">#{index + 1}</span>
                 <span className="task-name">{task.name}</span>
               </div>
-              <button 
+              <button
                 className="task-action cancel"
                 onClick={() => handleCancelTask(task.id)}
               >
@@ -126,26 +137,41 @@ function TaskMonitor({ taskManager }) {
                   {task.status}
                 </span>
               </div>
-              
+
               <div className="task-details">
                 <div className="task-config">
                   Model: {task.config.model} • Files: {task.config.files?.length || 0}
                 </div>
-                
+
                 {task.progress && (
                   <div className="task-progress">{task.progress}</div>
                 )}
-                
+
                 <div className="task-meta">
-                  Created: {new Date(task.created).toLocaleString()}
+                  <div>Created: {new Date(task.created).toLocaleString()}</div>
+                  <div>Job ID: {task.id}</div>
                   {task.started && (
-                    <span> • Duration: {formatDuration(task.started, task.completed)}</span>
+                    <div>Duration: {formatDuration(task.started, task.completed)}</div>
                   )}
                 </div>
 
                 {task.result && task.result.error && (
                   <div className="task-error">
-                    Error: {task.result.error}
+                    <div
+                      className="error-header"
+                      onClick={() => toggleErrorExpansion(task.id)}
+                      style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+                    >
+                      <span className="error-toggle">
+                        {expandedErrors.has(task.id) ? '▼' : '▶'}
+                      </span>
+                      <span>Error occurred (click to expand)</span>
+                    </div>
+                    {expandedErrors.has(task.id) && (
+                      <div className="error-details" style={{ marginTop: '8px', paddingLeft: '20px' }}>
+                        {task.result.error}
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -157,26 +183,51 @@ function TaskMonitor({ taskManager }) {
               </div>
 
               <div className="task-actions">
+                {task.status === TASK_STATUS.UNSTARTED && (
+                  <>
+                    <button
+                      className="task-action start"
+                      onClick={() => handleRetryTask(task.id)}
+                    >
+                      Start Task
+                    </button>
+                    <button
+                      className="task-action delete"
+                      onClick={() => handleDeleteTask(task.id)}
+                    >
+                      Delete
+                    </button>
+                  </>
+                )}
+
                 {task.status === TASK_STATUS.RUNNING && (
-                  <button 
+                  <button
                     className="task-action cancel"
                     onClick={() => handleCancelTask(task.id)}
                   >
                     Cancel
                   </button>
                 )}
-                
+
                 {task.status === TASK_STATUS.FAILED && (
-                  <button 
-                    className="task-action retry"
-                    onClick={() => handleRetryTask(task.id)}
-                  >
-                    Retry
-                  </button>
+                  <>
+                    <button
+                      className="task-action retry"
+                      onClick={() => handleRetryTask(task.id)}
+                    >
+                      Retry
+                    </button>
+                    <button
+                      className="task-action delete"
+                      onClick={() => handleDeleteTask(task.id)}
+                    >
+                      Delete
+                    </button>
+                  </>
                 )}
-                
-                {task.status !== TASK_STATUS.RUNNING && (
-                  <button 
+
+                {[TASK_STATUS.COMPLETED, TASK_STATUS.CANCELLED].includes(task.status) && (
+                  <button
                     className="task-action delete"
                     onClick={() => handleDeleteTask(task.id)}
                   >
