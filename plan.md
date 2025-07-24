@@ -331,6 +331,11 @@ inference issue: birdset model not producing outputs if clips are <5 seconds
 - checkbox for 'Save separate outputs per subfolder'. 
 
 ## inference tab updates:
+- cannot select files: select files: TypeError: window.electronAPI.selectAudioFiles is not a function
+    at handleFileSelection (TaskCreationForm.js:19:1)
+- remove clip duration argument: clip duration is based on the selected model
+- remove threshold argument: the inference script saves continuous score outputs
+
 - refactor as "create inference tasks": when user selects settings and clicks 'create and run task' button, the task gets a name then launches background task and monitors progress in a pane that monitors each task. Alternatively can click 'create task' button to create but not start the inference task. API is not disabled when task begins: instead, user can create additional inference tasks that are queued to run after the running one is complete. We will need background task monitoring. Give each inference task a unique ID, and put this ID in the config json file name. A tasks pane monitors the status of inference tasks: completed, running, failed, queued, or unstarted. Buttons next to each task in the task pane allow users to:
   - start unstarted tasks (run immediately if no task is running, otherwise add to queue)
   - rerun completed / canceled / failed tasks 
