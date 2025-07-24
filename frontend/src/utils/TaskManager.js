@@ -361,9 +361,21 @@ class TaskManager {
   // Utility Methods
   generateTaskName(config) {
     const modelName = config.model || 'Unknown';
-    const fileCount = config.files ? config.files.length : 0;
     const timestamp = new Date().toLocaleString();
-    return `${modelName} - ${fileCount} files - ${timestamp}`;
+    
+    // Generate appropriate file description based on selection mode
+    let fileDescription = '';
+    if (config.files && config.files.length > 0) {
+      fileDescription = `${config.files.length} files`;
+    } else if (config.file_globbing_patterns && config.file_globbing_patterns.length > 0) {
+      fileDescription = 'pattern-based';
+    } else if (config.file_list) {
+      fileDescription = 'file list';
+    } else {
+      fileDescription = 'no files';
+    }
+    
+    return `${modelName} - ${fileDescription} - ${timestamp}`;
   }
 
   // Persistence
@@ -403,7 +415,8 @@ class TaskManager {
       if (task.status === TASK_STATUS.RUNNING) {
         this.updateTask(task.id, { 
           status: TASK_STATUS.QUEUED,
-          progress: 'Reconnected - queued for execution'
+          progress: 'Reconnected - queued for execution',
+          started: null  // Clear started timestamp so it gets a fresh start time
         });
       }
       return task.id;
@@ -433,8 +446,12 @@ class TaskManager {
 
   // Queue Info
   getQueueInfo() {
+    // Only show currentTask if it's actually still running
+    const currentTask = this.currentTask ? this.getTask(this.currentTask) : null;
+    const isCurrentTaskRunning = currentTask && currentTask.status === TASK_STATUS.RUNNING;
+    
     return {
-      currentTask: this.currentTask ? this.getTask(this.currentTask) : null,
+      currentTask: isCurrentTaskRunning ? currentTask : null,
       queueLength: this.queue.length,
       nextTasks: this.queue.slice(0, 3).map(id => this.getTask(id))
     };

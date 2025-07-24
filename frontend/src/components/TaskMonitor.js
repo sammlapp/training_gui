@@ -67,6 +67,15 @@ function TaskMonitor({ taskManager }) {
     }
   };
 
+  const handleClearHistory = () => {
+    if (taskManager && window.confirm('Clear all completed, failed, and canceled tasks?')) {
+      const tasksToDelete = tasks.filter(task => 
+        [TASK_STATUS.COMPLETED, TASK_STATUS.FAILED, TASK_STATUS.CANCELLED].includes(task.status)
+      );
+      tasksToDelete.forEach(task => taskManager.deleteTask(task.id));
+    }
+  };
+
   const toggleErrorExpansion = (taskId) => {
     const newExpanded = new Set(expandedErrors);
     if (newExpanded.has(taskId)) {
@@ -127,7 +136,16 @@ function TaskMonitor({ taskManager }) {
 
       {/* All Tasks */}
       <div className="all-tasks">
-        <h4>All Tasks ({tasks.length})</h4>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h4>All Tasks ({tasks.length})</h4>
+          <button 
+            className="task-action clear-history"
+            onClick={handleClearHistory}
+            style={{ fontSize: '0.8rem', padding: '4px 8px' }}
+          >
+            Clear History
+          </button>
+        </div>
         <div className="task-list">
           {tasks.map(task => (
             <div key={task.id} className={`task-card ${task.status}`}>
@@ -140,12 +158,10 @@ function TaskMonitor({ taskManager }) {
 
               <div className="task-details">
                 <div className="task-config">
-                  Model: {task.config.model} • Files: {
-                    task.config.files?.length || 
-                    (task.config.file_globbing_patterns?.length ? 'Pattern-based' : '') ||
-                    (task.config.file_list ? 'List-based' : '') ||
-                    0
-                  }
+                  Model: {task.config.model}
+                  {task.config.files?.length > 0 && ` • Files: ${task.config.files.length}`}
+                  {task.config.file_globbing_patterns?.length > 0 && ' • Pattern-based selection'}
+                  {task.config.file_list && ' • File list selection'}
                 </div>
 
                 {task.progress && (
@@ -231,7 +247,24 @@ function TaskMonitor({ taskManager }) {
                   </>
                 )}
 
-                {[TASK_STATUS.COMPLETED, TASK_STATUS.CANCELLED].includes(task.status) && (
+                {task.status === TASK_STATUS.CANCELLED && (
+                  <>
+                    <button
+                      className="task-action retry"
+                      onClick={() => handleRetryTask(task.id)}
+                    >
+                      Retry
+                    </button>
+                    <button
+                      className="task-action delete"
+                      onClick={() => handleDeleteTask(task.id)}
+                    >
+                      Delete
+                    </button>
+                  </>
+                )}
+
+                {task.status === TASK_STATUS.COMPLETED && (
                   <button
                     className="task-action delete"
                     onClick={() => handleDeleteTask(task.id)}

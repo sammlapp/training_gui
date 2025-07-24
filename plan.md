@@ -327,7 +327,26 @@ inference issue: BirdSet model not producing outputs if clips are <5 seconds
 ## inference tab updates:
 - app should download the appropriate env for inference if needed. tell user its downloading and will be saved for future use
 
-- checkbox for 'Save separate outputs per subfolder'. 
+- checkbox for 'Separate inference by subfolders'
+
+### add process ID tracking to reconnect with running process across app close/restart
+The running task continues when the app quits.
+
+  Here's what happens:
+
+  1. Inference subprocess keeps running - The python inference.py process started
+  by lightweight_server.py runs independently
+  2. Server shuts down - The HTTP server stops, losing connection to the subprocess
+  3. Task status becomes orphaned - On restart, the task gets reset to QUEUED
+  status (we just fixed this)
+  4. Results still get saved - The inference completes and saves output files
+  normally
+
+  Issue: No way to reconnect to the orphaned process or get its results back into
+  the task system.
+
+  Potential improvements:
+  - Add process ID tracking to reconnect on restart
 
 ## inference tab updates:
 
@@ -344,13 +363,6 @@ Inference settings panel:
 
 option to split up inference tasks into one task per subfolder
 
-Inference Task Management:
-- Add button next to the section title to clear history (clears completed/failed/canceled tasks)
-- bug: "Currently Running" area still shows the most recent task after it completes
-- Canceled tasks are disappearing but should remain in the task tracker. 
-- Canceled tasks should have the 'Retry' button like failed tasks
-- Bug in task title # files reported: title line of each task panel reports "0 Files" if globbing patterns, file list document, or folder is used for file selection. The status bar also shows the same text with "0 Files". The file selection panel is correctly reporting the number of files located, and the inference is running properly on those files, so we just need to correctly pass the computed number of files to the inference panel. If this requires adding complexity to the current setup, simply remove the "0 Files" text from the header. 
-- Duration bug: Running time of Currently Running task restarts with app restart, but should be calculated from the task start time
 
 - TODO: how to divide up inference task? by subfolders? aggregate results or keep separate?
 - TODO: better progress reporting, currently goes from 0-100 instantly
