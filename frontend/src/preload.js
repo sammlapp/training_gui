@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   selectFiles: () => ipcRenderer.invoke('select-files'),
   selectFolder: () => ipcRenderer.invoke('select-folder'),
   selectCSVFiles: () => ipcRenderer.invoke('select-csv-files'),
+  selectJSONFiles: () => ipcRenderer.invoke('select-json-files'),
   saveFile: (defaultName) => ipcRenderer.invoke('save-file', defaultName),
   writeFile: (filePath, content) => ipcRenderer.invoke('write-file', filePath, content),
 
@@ -20,6 +21,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Audio processing
   createAudioClips: (filePath, startTime, endTime, settings) =>
     ipcRenderer.invoke('create-audio-clips', filePath, startTime, endTime, settings),
+
+  // Environment path management
+  getEnvironmentPath: (envName) => ipcRenderer.invoke('get-environment-path', envName),
+  getArchivePath: (archiveName) => ipcRenderer.invoke('get-archive-path', archiveName),
+  getUserDataPath: () => ipcRenderer.invoke('get-user-data-path'),
 
   // Python output listener
   onPythonOutput: (callback) => {

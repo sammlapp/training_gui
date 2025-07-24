@@ -10,11 +10,27 @@ import numpy as np
 import sys
 import os
 
-def load_scores(file_path):
+def count_csv_rows(file_path):
+    """Count rows in CSV file without loading all data"""
+    try:
+        # Read just to get the shape quickly
+        df_sample = pd.read_csv(file_path, nrows=1)
+        # Count total lines in file (subtract 1 for header)
+        with open(file_path, 'r') as f:
+            total_lines = sum(1 for _ in f) - 1
+        return total_lines
+    except Exception:
+        return 0
+
+def load_scores(file_path, max_rows=None):
     """Load scores from CSV file"""
     try:
         # Try to load as multi-index (opensoundscape format)
         df = pd.read_csv(file_path, index_col=[0, 1, 2])
+        
+        # If max_rows specified and data is too large, randomly sample
+        if max_rows and len(df) > max_rows:
+            df = df.sample(n=max_rows, random_state=42)
         
         # Convert to format suitable for frontend
         scores = {}
@@ -49,6 +65,10 @@ def load_scores(file_path):
         # Try to load as simple CSV
         try:
             df = pd.read_csv(file_path)
+            
+            # If max_rows specified and data is too large, randomly sample
+            if max_rows and len(df) > max_rows:
+                df = df.sample(n=max_rows, random_state=42)
             
             # Assume first column is file path, rest are scores
             if 'file' in df.columns:
@@ -90,6 +110,8 @@ def load_scores(file_path):
 def main():
     parser = argparse.ArgumentParser(description='Load scores file')
     parser.add_argument('file_path', help='Path to scores CSV file')
+    parser.add_argument('--max-rows', type=int, help='Maximum number of rows to load (random sample if exceeded)')
+    parser.add_argument('--count-only', action='store_true', help='Only count rows, do not load data')
     
     args = parser.parse_args()
     
@@ -97,7 +119,12 @@ def main():
         if not os.path.exists(args.file_path):
             raise FileNotFoundError(f"File not found: {args.file_path}")
         
-        result = load_scores(args.file_path)
+        if args.count_only:
+            row_count = count_csv_rows(args.file_path)
+            result = {'row_count': row_count}
+        else:
+            result = load_scores(args.file_path, max_rows=args.max_rows)
+        
         print(json.dumps(result))
         
     except Exception as e:

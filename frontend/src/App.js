@@ -31,12 +31,16 @@ function App() {
   ];
 
   const models = {
-    'HawkEars': 'HawkEars Canadian bird classification CNN v0.1.0 (PyTorch)',
-    'RanaSierraeCNN': 'CNN trained to detect Rana sierrae calls (PyTorch)',
-    // TensorFlow-dependent models excluded for distribution build: BirdNET, Perch, SeparationModel
-    'BirdSetConvNeXT': 'BirdSet: ConvNext Global Bird Song Classification Model (PyTorch)',
-    'BirdSetBirdSetEfficientNetB1': 'BirdSet: EfficientNetB1 Global Bird Song Classification Model (PyTorch)',
-  };
+    "BirdNET": "Global bird species classification (TF Lite)",
+    // # "SeparationModel": "no description",
+    // # "YAMNet": "no description",
+    // # "Perch": "Global bird species classification (TensorFlow)",
+    "HawkEars": "HawkEars North American bird classification CNN v1.0.8 (Pytorch)",
+    "HawkEars_v010": "HawkEars North American bird classification CNN v0.1.0 (Pytorch)",
+    "HawkEars_Low_Band": "HawkEars Ruffed Grouse and Spruce Grouse detector v1.0.8 (Pytorch)",
+    "HawkEars_Embedding": "HawkEars EfficientNet Classifier v1.0.8 (Pytorch)",
+    "RanaSierraeCNN": "CNN trained to detect Rana sierrae calls (Pytorch)",
+  }
 
   // Set up Python output listener
   useEffect(() => {
@@ -145,7 +149,7 @@ function App() {
 
     try {
       const processId = Date.now().toString();
-      
+
       // Create temporary config file
       const tempConfigPath = `/tmp/inference_config_${processId}.json`;
       const configData = {
@@ -175,9 +179,18 @@ function App() {
 
       // Run inference with environment setup via HTTP API
       setProgress('Setting up ML environment and running inference...');
-      const envPath = './runtime_envs/dipper_pytorch_env';
-      const archivePath = './environments/dipper_pytorch_env.tar.gz';
-      
+
+      // Get environment paths using Electron userData directory
+      const envPathResult = await window.electronAPI.getEnvironmentPath('dipper_pytorch_env');
+      const archivePathResult = await window.electronAPI.getArchivePath('dipper_pytorch_env.tar.gz');
+
+      if (!envPathResult.success || !archivePathResult.success) {
+        throw new Error('Failed to get environment paths');
+      }
+
+      const envPath = envPathResult.path;
+      const archivePath = archivePathResult.path;
+
       const inferenceResponse = await fetch('http://localhost:8000/inference/run', {
         method: 'POST',
         headers: {
@@ -191,13 +204,13 @@ function App() {
       });
 
       const inferenceResult = await inferenceResponse.json();
-      
+
       if (inferenceResult.status === 'success') {
         setProgress('Inference completed successfully!');
         if (outputFile) {
           setProgress(prev => prev + ` Results saved to: ${outputFile.split('/').pop()}`);
         }
-        
+
         // Parse any results from the inference output
         if (inferenceResult.output) {
           try {
@@ -217,15 +230,25 @@ function App() {
               }
             }
 
-            if (summary && summary.species_detected && summary.species_detected.length > 0) {
-              setProgress(prev => prev + `. Detected species: ${summary.species_detected.slice(0, 3).join(', ')}${summary.species_detected.length > 3 ? '...' : ''}`);
-            }
           } catch (parseError) {
             // Ignore parsing errors for output
           }
         }
       } else {
-        throw new Error(inferenceResult.error || 'Inference failed');
+        // Show detailed error information
+        let errorMessage = inferenceResult.error || 'Inference failed';
+
+        if (inferenceResult.details) {
+          errorMessage += '\n\nDetails:\n' + inferenceResult.details;
+        } else if (inferenceResult.stderr) {
+          errorMessage += '\n\nError output:\n' + inferenceResult.stderr;
+        }
+
+        if (inferenceResult.stdout) {
+          errorMessage += '\n\nStandard output:\n' + inferenceResult.stdout;
+        }
+
+        throw new Error(errorMessage);
       }
 
     } catch (err) {
@@ -275,7 +298,7 @@ function App() {
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
       const defaultName = `inference_config_${timestamp}.json`;
       const configPath = await window.electronAPI.saveFile(defaultName);
-      
+
       if (configPath) {
         const configData = {
           model: selectedModel,
@@ -315,7 +338,7 @@ function App() {
         return;
       }
 
-      const configFile = await window.electronAPI.selectFiles();
+      const configFile = await window.electronAPI.selectJSONFiles();
       if (configFile && configFile.length > 0) {
         // Use HTTP API to load config
         const response = await fetch('http://localhost:8000/config/load', {
@@ -365,7 +388,7 @@ function App() {
       <main className="main-content">
         {activeTab === 'inference' && (
           <div className="tab-content">
-            <h2>Species Detection Inference</h2>
+            {/* <h2>Species Detection Inference</h2> */}
 
             {error && (
               <div className="error-message">
@@ -380,34 +403,30 @@ function App() {
             )}
 
             <div className="section">
-              <h3>1. Select Model</h3>
-              <select
-                value={selectedModel}
-                onChange={(e) => setSelectedModel(e.target.value)}
-                disabled={isRunning}
-              >
-                <option value="">Choose a model...</option>
-                {Object.entries(models).map(([name, description]) => (
-                  <option key={name} value={name}>
-                    {name} - {description}
-                  </option>
-                ))}
-              </select>
-            </div>
+              <h3>Inference Setup</h3>
 
-            <div className="section">
-              <h3>2. Configure Settings</h3>
-              <div className="button-group" style={{ marginBottom: '15px' }}>
-                <button onClick={saveInferenceConfig} disabled={isRunning}>
-                  Save Config
-                </button>
-                <button onClick={loadInferenceConfig} disabled={isRunning}>
-                  Load Config
-                </button>
-              </div>
-              <div className="config-grid">
-                <label>
-                  Clip Overlap (seconds):
+              {/* Compact settings grid */}
+              <div className="inference-setup-grid">
+                {/* Model Selection */}
+                <div className="setting-group">
+                  <label>Model:</label>
+                  <select
+                    value={selectedModel}
+                    onChange={(e) => setSelectedModel(e.target.value)}
+                    disabled={isRunning}
+                  >
+                    <option value="">Choose a model...</option>
+                    {Object.entries(models).map(([name, description]) => (
+                      <option key={name} value={name}>
+                        {name} - {description}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Inference Settings */}
+                <div className="setting-group">
+                  <label>Clip Overlap (seconds):</label>
                   <input
                     type="number"
                     step="0.1"
@@ -417,10 +436,12 @@ function App() {
                       inference: { ...prev.inference, clip_overlap: parseFloat(e.target.value) }
                     }))}
                     disabled={isRunning}
+                    style={{ width: '80px' }}
                   />
-                </label>
-                <label>
-                  Batch Size:
+                </div>
+
+                <div className="setting-group">
+                  <label>Batch Size:</label>
                   <input
                     type="number"
                     min="1"
@@ -430,10 +451,12 @@ function App() {
                       inference: { ...prev.inference, batch_size: parseInt(e.target.value) }
                     }))}
                     disabled={isRunning}
+                    style={{ width: '60px' }}
                   />
-                </label>
-                <label>
-                  Num Workers:
+                </div>
+
+                <div className="setting-group">
+                  <label>Workers:</label>
                   <input
                     type="number"
                     min="0"
@@ -443,58 +466,73 @@ function App() {
                       inference: { ...prev.inference, num_workers: parseInt(e.target.value) }
                     }))}
                     disabled={isRunning}
+                    style={{ width: '60px' }}
                   />
-                </label>
-              </div>
-            </div>
+                </div>
 
-            <div className="section">
-              <h3>3. Select Audio Files</h3>
-              <div className="button-group">
-                <button onClick={handleSelectFiles} disabled={isRunning}>
-                  Select Files
-                </button>
-                <button onClick={handleSelectFolder} disabled={isRunning}>
-                  Select Folder
-                </button>
-              </div>
-              <p className="file-count">
-                Selected files: {selectedFiles.length}
-                {selectedFiles.length > 0 && (
-                  <span className="file-sample">
-                    <br />First file: {selectedFiles[0].split('/').pop()}
-                  </span>
-                )}
-              </p>
-            </div>
+                {/* File Selection */}
+                <div className="setting-group">
+                  <label>Audio Files:</label>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <button onClick={handleSelectFiles} disabled={isRunning}>
+                      Select Files
+                    </button>
+                    <button onClick={handleSelectFolder} disabled={isRunning}>
+                      Select Folder
+                    </button>
+                    <span className="file-count-inline">({selectedFiles.length} files)</span>
+                  </div>
+                </div>
 
-            <div className="section">
-              <h3>4. Output Location (Optional)</h3>
-              <button onClick={handleSelectOutputFile} disabled={isRunning}>
-                Select Output File
-              </button>
-              {outputFile && (
-                <p className="output-path">Output: {outputFile}</p>
+                {/* Output Location */}
+                <div className="setting-group">
+                  <label>Output:</label>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <button onClick={handleSelectOutputFile} disabled={isRunning}>
+                      Select Output File
+                    </button>
+                    {outputFile && <span className="output-file-name">{outputFile.split('/').pop()}</span>}
+                  </div>
+                </div>
+              </div>
+
+              {/* Config and Action buttons */}
+              <div className="action-buttons" style={{ marginTop: '15px' }}>
+                <div className="button-group">
+                  <button onClick={saveInferenceConfig} disabled={isRunning}>
+                    Save Config
+                  </button>
+                  <button onClick={loadInferenceConfig} disabled={isRunning}>
+                    Load Config
+                  </button>
+                </div>
+
+                <div className="button-group">
+                  <button
+                    className="primary-button"
+                    onClick={handleRunInference}
+                    disabled={isRunning || !selectedModel || selectedFiles.length === 0}
+                  >
+                    {isRunning ? 'Running...' : 'Run Inference'}
+                  </button>
+                  <button onClick={clearLogs} disabled={isRunning}>
+                    Clear Logs
+                  </button>
+                  <button onClick={handleTestPython} disabled={isRunning}>
+                    Test Python Path
+                  </button>
+                </div>
+              </div>
+
+              {/* File info display */}
+              {selectedFiles.length > 0 && (
+                <div className="file-info" style={{ marginTop: '10px', fontSize: '0.9em', color: '#666' }}>
+                  Selected {selectedFiles.length} file{selectedFiles.length !== 1 ? 's' : ''}
+                  {selectedFiles.length > 0 && (
+                    <span> • First: {selectedFiles[0].split('/').pop()}</span>
+                  )}
+                </div>
               )}
-            </div>
-
-            <div className="section">
-              <h3>5. Run Inference</h3>
-              <div className="button-group">
-                <button
-                  className="primary-button"
-                  onClick={handleRunInference}
-                  disabled={isRunning || !selectedModel || selectedFiles.length === 0}
-                >
-                  {isRunning ? 'Running...' : 'Run Inference'}
-                </button>
-                <button onClick={clearLogs} disabled={isRunning}>
-                  Clear Logs
-                </button>
-                <button onClick={handleTestPython} disabled={isRunning}>
-                  Test Python Path
-                </button>
-              </div>
             </div>
 
             {logs.length > 0 && (

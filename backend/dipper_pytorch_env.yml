@@ -28,6 +28,7 @@ dependencies:
   - transformers>=4.53.2
   - lightning>=2.0.0
 
+
   # Audio processing 
   - librosa
 
@@ -49,6 +50,9 @@ dependencies:
     # Audio processing packages
     - soundfile>=0.10.0
 
+    # Machine learning and data processing
+    - ai-edge-litert>=1.3.0
+
     # Bioacoustics libraries
     - opensoundscape>=0.11.0
-    - git+https://github.com/kitzeslab/bioacoustics-model-zoo.git
+    - git+https://github.com/kitzeslab/bioacoustics-model-zoo.git@0.12.0

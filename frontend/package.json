@@ -1,5 +1,5 @@
 {
-  "name": "bioacoustics-training-gui",
+  "name": "dipper",
   "version": "1.0.0",
   "description": "Cross-platform desktop app for bioacoustics ML training and inference",
   "main": "src/main.js",
@@ -43,7 +43,7 @@
   "build": {
     "extends": null,
     "appId": "com.bioacoustics.traininggui",
-    "productName": "Bioacoustics Training GUI",
+    "productName": "Dipper",
     "directories": {
       "output": "../dist"
     },
@@ -52,6 +52,7 @@
     "buildDependenciesFromSource": false,
     "files": [
       "build/**/*",
+      "src/**/*",
       "dist-electron/**/*",
       "assets/**/*",
       "!assets/*.ai",
@@ -86,7 +87,7 @@
     ],
     "mac": {
       "category": "public.app-category.developer-tools",
-      "icon": false,
+      "icon": "assets/icon.icns",
       "hardenedRuntime": false,
       "gatekeeperAssess": false,
       "target": [
@@ -122,7 +123,7 @@
       ]
     },
     "dmg": {
-      "title": "Bioacoustics Training GUI",
+      "title": "Dipper",
       "icon": "assets/icon.icns",
       "background": null,
       "contents": [

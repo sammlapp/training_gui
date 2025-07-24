@@ -16,9 +16,10 @@ streamlit_inference.py is provided as a reference for understanding and porting 
 
 # Build pipeline checklist
 - pyinstaller build of lightweight env is working
+- running app using pyinstaller for lightweight backend: works well
 - conda-pack is now succeeding after resolving issues with packages installed with conda then modified by pip
-- running app using pyinstaller for lightweight backend: still testing if this is working but seems ok so far
-- 
+- the environment built with conda pack works. I can run /path/to/env/bin/python backend/scripts/predict.py --config /path/to/config.txt. It runs inference and creates the csv. 
+- inference in the GUI is broken
 
 # Visual design
 
@@ -87,6 +88,15 @@ User will select an annotation task. The interface will be very similar to that 
 - binary review: as in binary_classification_review.py, there is a multi-select for 'yes' 'no' 'uncertain' or 'unlabeled' for each audio clip. A visual effect (eg colored outline green/yellow/red/grey) indicates the current label of the clip. Optionally, the user can toggle on "show comment field" and write text comments. `annototation` value is yes/no/uncertain or empty (nan) for not annotated
 - multi-class review: each audio clip panel has multi-select (react-select) instead of multi-select of yes/no/uncertain/unlabeled. `annotation` column will contain a comma-separated list of classes ['a','b']. Empty list [] indicates annotated and no classes, whereas empty / nan indicates the clip has not been annotated. 
 - implement a settings panel with spectrogram window length, frequency bandpass range, dB range, colormap, number of rows and columns for grid of displayed clips, show/hide comments field, show/hide file name
+
+
+## build strategy
+- implement saving and loading all inference settings, including paths, to a config file. The path to the config file will be the single argument taken by the inference.py script. 
+- we will use pyinstaller to build an executable for the backend scripts EXCLUDING ml and heavy dependencies (no predict, train embed). The scripts should only depend on pandas, matplotlib, numpy, librosa, etc. They will not require pytorch, opensoundscape, or bioacoustics-model-zoo
+- we will build frozen python enviornment(s) that will be downloaded on an as-needed basis: for now, just dipper_pytorch_env.yml which we will build using conda-pack to create a .tar.gz. 
+- inference will run in the background by writing a config file, and running the python script specifying the inference environment python, something like `/path/to/dipper_pytorch_env/bin/python inference.py --config inference_config.yml &"
+- make sure we can build the app, communicate between the frontend and backend with the pyinstaller compiled simpler backend enviornment, build the distributable environment with conda-pack, and run a simple python script using the conda-pack env
+
 
 ## Shortcuts for review tab (when in grid view):
 - generally, use ctrl for window and cmd for mac
@@ -307,14 +317,28 @@ add toggle in inference script to embed instead or in addition to classification
 
 consolidate the global theming options into a simple config or css file, so that I can make edits to the set of colors, fonts, font weights, font sizes, overall spacing values in one place for the entire app. 
 
+- if one or more audio files is not found when trying to display it, provide a helpful message like: f"Audio file was not found in {absolute_path}.  Set 'Root Audio Folder' to the location from which relative paths are specified in the 'file' column of the annotation csv, or clear it if absolute paths are specified."
 
-## inference updates:
+## conda-pack updates:
+- if on linux or mac, include ai-edge-litert as a dependency and allow BirdNET use in the inference gui
 
-- refactor as "create inference tasks" -> when user selects settings and clicks 'create and run task', task gets a name then launches background task and monitors progress in a pane that monitors each task. Alternatively can click 'create tasks' to create but not start the inference task. API is not disabled when task begins: instead, user can create additional inference tasks that are queued to run after the running one is complete. A tasks pane monitors tue status of inference tasks: completed, running, failed, queued, or unstarted. Buttons next to each task allow users to:
+inference issue: birdset model not producing outputs if clips are <5 seconds
+
+## inference tab updates:
+- app should download the appropriate env for inference if needed. tell user its downloading and will be saved for future use
+
+- if selecting all files in a folder, config file should contain the folder path rather than a list of all audio files. inference.py will need to handle globbing the files based on the config. 
+- checkbox for 'Save separate outputs per subfolder'. 
+
+## inference tab updates:
+- refactor as "create inference tasks": when user selects settings and clicks 'create and run task' button, the task gets a name then launches background task and monitors progress in a pane that monitors each task. Alternatively can click 'create task' button to create but not start the inference task. API is not disabled when task begins: instead, user can create additional inference tasks that are queued to run after the running one is complete. We will need background task monitoring. Give each inference task a unique ID, and put this ID in the config json file name. A tasks pane monitors the status of inference tasks: completed, running, failed, queued, or unstarted. Buttons next to each task in the task pane allow users to:
   - start unstarted tasks (run immediately if no task is running, otherwise add to queue)
-  - rerun completed or canceled tasks
+  - rerun completed / canceled / failed tasks 
   - cancel a running task (interrupts / kills the background process)
-  Make sure the task pane persists or re-loads appropriately if the user navigates to another tab and back. 
+Make sure the task pane persists or re-loads appropriately if the user navigates to another tab and back, or even if the app completely restarts. Make a careful plan for how and where to store or fetch information about the status of inference tasks. 
+- instead of displaying messages in a div at the top of the page (like "Setting up ML environment and running inference..."), add a fixed-position status bar at the bottom of the window for displaying messages.
+
+future items:
 - subset classes: can use text file or ebird filter
 - optional sparse outputs: don't save scores below a floor, and save df as a sparse pickle
 
@@ -324,21 +348,9 @@ consolidate the global theming options into a simple config or css file, so that
 
 
 # Explore tab updates
-- remove "Score Distribution" text from the panel headings
-- when you click on a histogram bar, panel says "click to load spectrogram" but should instead say "loading spectrogram..."  
 - should have a little button in the panel (gold medal icon: 🥇) to return to viewing the highest-scoring clip (eg after clicking on a histogram bin)
-- put the settings in a side panel, exactly like the settings in the review tab
+- put the settings in a side panel/tray, exactly like the settings panel in the review tab
+
+future items:
 - use Material UI badges and small photos of the class detected for quick overview (use birdnames repo for name translation, find open-source set of images for species headshots or use the global bird svgs dataset)
 
-## build strategy
-- implement saving and loading all inference settings, including paths, to a config file. The path to the config file will be the single argument taken by the inference.py script. 
-- we will use pyinstaller to build an executable for the backend scripts EXCLUDING ml and heavy dependencies (no predict, train embed). The scripts should only depend on pandas, matplotlib, numpy, librosa, etc. They will not require pytorch, opensoundscape, or bioacoustics-model-zoo
-- we will build frozen python enviornment(s) that will be downloaded on an as-needed basis: for now, just dipper_pytorch_env.yml which we will build using conda-pack to create a .tar.gz. 
-- inference will run in the background by writing a config file, and running the python script specifying the inference environment python, something like `/path/to/dipper_pytorch_env/bin/python inference.py --config inference_config.yml &"
-- make sure we can build the app, communicate between the frontend and backend with the pyinstaller compiled simpler backend enviornment, build the distributable environment with conda-pack, and run a simple python script using the conda-pack env
-
-
-## long-term plan for shipping environments for BMZ models
-- build a set of a few environments necessary to run bmz models
-- only download the required env on-demand
-- if not running bmz models/training, user has light weight env for backend, and can do annotation tasks without heavy PyTorch env

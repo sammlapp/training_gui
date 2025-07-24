@@ -77,13 +77,13 @@ export const useBatchAudioLoader = () => {
         addDebug('Batch processing result', result);
       } catch (batchError) {
         addDebug('Batch processing failed, trying individual clips', { error: batchError.message });
-        
+
         // Fallback to individual clip processing
         const individualResults = [];
         for (let i = 0; i < clipsForBatch.length; i++) {
           const clip = clipsForBatch[i];
           setProgress((i / clipsForBatch.length) * 100);
-          
+
           try {
             const individualResult = await window.electronAPI.createAudioClips(
               clip.file_path,
@@ -91,7 +91,7 @@ export const useBatchAudioLoader = () => {
               clip.end_time,
               defaultSettings
             );
-            
+
             if (individualResult.status === 'success') {
               individualResults.push({
                 ...individualResult,
@@ -114,7 +114,7 @@ export const useBatchAudioLoader = () => {
             });
           }
         }
-        
+
         result = {
           status: 'success',
           results: individualResults
@@ -123,7 +123,7 @@ export const useBatchAudioLoader = () => {
 
       if (result.status === 'success') {
         setProgress(100);
-        
+
         // Transform results back to match expected format
         const processedClips = result.results.map((clipResult, index) => ({
           ...clipDataArray[index],
@@ -174,7 +174,7 @@ export const BatchLoadingProgress = ({ isLoading, progress, error, totalClips })
       {isLoading && (
         <div className="loading-indicator">
           <div className="progress-bar">
-            <div 
+            <div
               className="progress-fill"
               style={{ width: `${progress}%` }}
             />
@@ -184,7 +184,7 @@ export const BatchLoadingProgress = ({ isLoading, progress, error, totalClips })
           </div>
         </div>
       )}
-      
+
       {error && (
         <div className="error-message">
           <strong>Error:</strong> {error}
@@ -197,10 +197,10 @@ export const BatchLoadingProgress = ({ isLoading, progress, error, totalClips })
 /**
  * Enhanced AudioClipCard that supports batch-loaded data
  */
-export const FastAudioClipCard = ({ 
-  clipData, 
-  showPredictions = false, 
-  showAnnotations = false, 
+export const FastAudioClipCard = ({
+  clipData,
+  showPredictions = false,
+  showAnnotations = false,
   showComments = false,
   onPlaybackChange = null,
   className = ""
@@ -293,9 +293,9 @@ export const FastAudioClipCard = ({
       {/* Spectrogram area */}
       <div className="spectrogram-container" onClick={handleSpectrogramClick}>
         {spectrogramUrl ? (
-          <img 
-            src={spectrogramUrl} 
-            alt="Spectrogram" 
+          <img
+            src={spectrogramUrl}
+            alt="Spectrogram"
             className="spectrogram-image"
             style={{ cursor: audioUrl ? 'pointer' : 'default' }}
           />
@@ -309,7 +309,7 @@ export const FastAudioClipCard = ({
         {/* Progress bar */}
         {duration > 0 && (
           <div className="progress-bar">
-            <div 
+            <div
               className="progress-fill"
               style={{ width: `${(currentTime / duration) * 100}%` }}
             />
@@ -325,16 +325,16 @@ export const FastAudioClipCard = ({
             {file_path ? file_path.split('/').pop() : 'Unknown file'}
           </div>
           <div className="time-range">
-            {start_time !== undefined && end_time !== undefined 
+            {start_time !== undefined && end_time !== undefined
               ? `${start_time.toFixed(1)}s - ${end_time.toFixed(1)}s`
               : 'Unknown time range'
             }
           </div>
-          {duration > 0 && (
+          {/* {duration > 0 && (
             <div className="duration">
               Duration: {formatTime(duration)}
             </div>
-          )}
+          )} */}
         </div>
 
         {/* Species and score */}
@@ -372,20 +372,20 @@ export const BatchLoadingDebugPanel = ({ debugInfo, isLoading, error }) => {
 
   return (
     <div className="batch-debug-panel">
-      <button 
+      <button
         className="debug-toggle"
         onClick={() => setIsExpanded(!isExpanded)}
       >
         🐛 Debug Info ({debugInfo.length} entries) {isExpanded ? '▼' : '▶'}
       </button>
-      
+
       {isExpanded && (
         <div className="debug-content">
           <div className="debug-status">
             <p><strong>Status:</strong> {isLoading ? 'Loading...' : 'Idle'}</p>
             {error && <p><strong>Error:</strong> {error}</p>}
           </div>
-          
+
           <div className="debug-log">
             <h4>Debug Log:</h4>
             <div className="debug-entries">

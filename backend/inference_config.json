@@ -1,0 +1,12 @@
+{
+    "model": "HawkEars",
+    "files": [
+        "/Users/SML161/sample_audio/amwo_5s.wav"
+    ],
+    "output_file": "",
+    "inference_settings": {
+        "clip_overlap": 0,
+        "batch_size": 1,
+        "num_workers": 0
+    }
+}

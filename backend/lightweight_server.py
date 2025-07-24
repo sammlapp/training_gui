@@ -117,9 +117,30 @@ def extract_environment(archive_path, extract_dir):
     except Exception as e:
         return {"status": "error", "error": str(e)}
 
+def resolve_path(path_str, base_dir=None):
+    """Resolve relative or absolute paths consistently"""
+    if os.path.isabs(path_str):
+        # Already absolute, use as-is
+        return path_str
+    else:
+        # Relative path - resolve relative to base_dir or current working directory
+        if base_dir:
+            return os.path.join(base_dir, path_str)
+        else:
+            return os.path.abspath(path_str)
+
 def setup_environment(env_dir, archive_path=None):
     """Set up environment - extract if needed, check if ready"""
     try:
+        # Resolve paths to absolute paths for consistency
+        env_dir = resolve_path(env_dir)
+        if archive_path:
+            archive_path = resolve_path(archive_path)
+        
+        logger.info(f"Setting up environment at: {env_dir}")
+        if archive_path:
+            logger.info(f"Archive path: {archive_path}")
+        
         # First check if environment already exists
         env_check = check_environment(env_dir)
         
@@ -159,6 +180,13 @@ def setup_environment(env_dir, archive_path=None):
 def run_inference_with_env(config_path, env_python_path):
     """Run inference using specified Python environment"""
     try:
+        # Resolve paths to absolute paths
+        config_path = resolve_path(config_path)
+        env_python_path = resolve_path(env_python_path)
+        
+        logger.info(f"Running inference with config: {config_path}")
+        logger.info(f"Using Python environment: {env_python_path}")
+        
         # Verify environment exists
         if not os.path.exists(env_python_path):
             return {"status": "error", "error": f"Python environment not found: {env_python_path}"}
@@ -186,10 +214,30 @@ def run_inference_with_env(config_path, env_python_path):
         stdout, stderr = process.communicate()
         return_code = process.returncode
         
+        logger.info(f"Inference process completed with exit code: {return_code}")
+        if stdout:
+            logger.info(f"Stdout: {stdout[:500]}...")  # Log first 500 chars
+        if stderr:
+            logger.error(f"Stderr: {stderr[:500]}...")  # Log first 500 chars
+        
         if return_code == 0:
-            return {"status": "success", "message": "Inference completed successfully", "output": stdout}
+            return {
+                "status": "success", 
+                "message": "Inference completed successfully", 
+                "output": stdout,
+                "stdout": stdout,
+                "stderr": stderr if stderr else ""
+            }
         else:
-            return {"status": "error", "error": f"Inference failed with exit code {return_code}", "stderr": stderr}
+            return {
+                "status": "error", 
+                "error": f"Inference failed with exit code {return_code}", 
+                "exit_code": return_code,
+                "stdout": stdout if stdout else "",
+                "stderr": stderr if stderr else "",
+                "command": " ".join(cmd),
+                "details": f"Command: {' '.join(cmd)}\nExit Code: {return_code}\nStdout: {stdout}\nStderr: {stderr}"
+            }
             
     except Exception as e:
         return {"status": "error", "error": str(e)}
@@ -372,7 +420,6 @@ class LightweightServer:
     def setup_routes(self):
         """Setup HTTP routes"""
         self.app.router.add_get("/", self.root_handler)
-        self.app.router.add_head("/", self.root_handler)
         self.app.router.add_get("/health", self.health_check)
         self.app.router.add_post("/scan_folder", self.scan_folder)
         self.app.router.add_post("/get_sample_detections", self.get_sample_detections)
@@ -654,13 +701,20 @@ class LightweightServer:
             data = await request.json()
             config_path = data.get("config_path")
             env_path = data.get("env_path")
+            archive_path = data.get("archive_path")
+            
+            logger.info(f"Inference request received:")
+            logger.info(f"  config_path: {config_path}")
+            logger.info(f"  env_path: {env_path}")
+            logger.info(f"  archive_path: {archive_path}")
             
             if not config_path or not env_path:
                 return web.json_response({"error": "config_path and env_path required"}, status=400)
             
             # First check/setup environment
-            env_result = setup_environment(env_path, data.get("archive_path"))
+            env_result = setup_environment(env_path, archive_path)
             if env_result["status"] != "ready":
+                logger.error(f"Environment setup failed: {env_result}")
                 return web.json_response(env_result, status=500)
             
             # Run inference

@@ -32,10 +32,16 @@ import {
 } from '@mui/icons-material';
 
 const AVAILABLE_MODELS = {
-  'HawkEars': 'HawkEars Canadian bird classification CNN v0.1.0 (PyTorch)',
-  'RanaSierraeCNN': 'CNN trained to detect Rana sierrae calls (PyTorch)',
-  // Note: BirdNET, Perch, and SeparationModel are excluded as they require TensorFlow
-};
+  "BirdNET": "Global bird species classification (TF Lite)",
+  // # "SeparationModel": "no description",
+  // # "YAMNet": "no description",
+  // # "Perch": "Global bird species classification (TensorFlow)",
+  "HawkEars": "HawkEars North American bird classification CNN v1.0.8 (Pytorch)",
+  "HawkEars_v010": "HawkEars North American bird classification CNN v0.1.0 (Pytorch)",
+  "HawkEars_Low_Band": "HawkEars Ruffed Grouse and Spruce Grouse detector v1.0.8 (Pytorch)",
+  "HawkEars_Embedding": "HawkEars EfficientNet Classifier v1.0.8 (Pytorch)",
+  "RanaSierraeCNN": "CNN trained to detect Rana sierrae calls (Pytorch)",
+}
 
 function InferenceTab({ config, updateConfig }) {
   const [selectedModel, setSelectedModel] = useState('');
@@ -102,7 +108,7 @@ function InferenceTab({ config, updateConfig }) {
 
     try {
       const processId = Date.now().toString();
-      
+
       // Listen for Python output
       const outputHandler = (event, data) => {
         if (data.processId === processId) {
@@ -134,9 +140,9 @@ function InferenceTab({ config, updateConfig }) {
 
       setProgress(100);
       setLogs(prev => [...prev, 'Inference completed successfully!']);
-      
+
       window.electronAPI.removePythonOutputListener(outputHandler);
-      
+
     } catch (err) {
       setError(`Inference failed: ${err.message}`);
     } finally {
@@ -269,18 +275,18 @@ function InferenceTab({ config, updateConfig }) {
                 Select Folder
               </Button>
             </Box>
-            
+
             <Typography variant="body2" sx={{ mb: 1 }}>
               Selected files: {selectedFiles.length}
             </Typography>
-            
+
             {selectedFiles.length > 0 && (
               <Box sx={{ maxHeight: 200, overflow: 'auto' }}>
                 <List dense>
                   {selectedFiles.slice(0, 10).map((file, index) => (
                     <ListItem key={index}>
-                      <ListItemText 
-                        primary={file.split('/').pop()} 
+                      <ListItemText
+                        primary={file.split('/').pop()}
                         secondary={file}
                       />
                       <IconButton onClick={() => removeFile(index)} size="small">
@@ -347,7 +353,7 @@ function InferenceTab({ config, updateConfig }) {
                 </Button>
               )}
             </Box>
-            
+
             {isRunning && (
               <Box sx={{ mb: 2 }}>
                 <LinearProgress variant="determinate" value={progress} />
@@ -356,7 +362,7 @@ function InferenceTab({ config, updateConfig }) {
                 </Typography>
               </Box>
             )}
-            
+
             {logs.length > 0 && (
               <Box sx={{ maxHeight: 200, overflow: 'auto', bgcolor: 'grey.100', p: 1 }}>
                 <Typography variant="body2" component="pre" sx={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>

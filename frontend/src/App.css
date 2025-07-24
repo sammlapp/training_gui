@@ -3688,7 +3688,7 @@ button:disabled {
 
 .review-toolbar {
   position: fixed;
-  top: 60px;
+  top: 45px;
   left: 0;
   right: 0;
   z-index: 100;
@@ -3921,7 +3921,8 @@ button:disabled {
   padding-bottom: calc(1rem + 32px);
   /* Account for fixed status bar height */
   box-sizing: border-box;
-  min-height: 0; /* Prevent flex item from taking minimum content height */
+  min-height: 0;
+  /* Prevent flex item from taking minimum content height */
 }
 
 .review-content.focus-mode {
@@ -3934,7 +3935,8 @@ button:disabled {
 .review-content.placeholder-mode {
   /* No flex properties - just regular block layout */
   padding: 2rem;
-  min-height: auto; /* Don't force height */
+  min-height: auto;
+  /* Don't force height */
 }
 
 .focus-view-container {
@@ -4115,4 +4117,150 @@ button:disabled {
   background-color: var(--alert);
   color: var(--white);
   transform: translateY(-1px);
+}
+
+/* Compact Inference Setup Grid */
+.inference-setup-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  margin-bottom: 15px;
+}
+
+.setting-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.setting-group label {
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: var(--dark);
+}
+
+.setting-group input,
+.setting-group select {
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 0.85rem;
+}
+
+.file-count-inline {
+  font-size: 0.8rem;
+  color: var(--medium-gray);
+  white-space: nowrap;
+}
+
+.output-file-name {
+  font-size: 0.8rem;
+  color: var(--medium-gray);
+  font-style: italic;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.action-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.file-info {
+  padding: 8px;
+  background-color: var(--light-gray);
+  border-radius: 4px;
+  border-left: 3px solid var(--dark-accent);
+}
+
+/* Mobile responsiveness for compact grid */
+@media (max-width: 768px) {
+  .inference-setup-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .action-buttons {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .button-group {
+    justify-content: center;
+  }
+}
+
+/* Modal Dialog Styles */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background-color: var(--white);
+  border-radius: 8px;
+  padding: 24px;
+  max-width: 500px;
+  width: 90%;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+}
+
+.modal-content h3 {
+  margin: 0 0 16px 0;
+  color: var(--dark);
+  font-size: 1.2rem;
+}
+
+.modal-content p {
+  margin: 12px 0;
+  color: var(--dark);
+  line-height: 1.5;
+}
+
+.modal-buttons {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 24px;
+}
+
+.button-primary {
+  background-color: var(--dark-accent);
+  color: var(--white);
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.button-primary:hover {
+  background-color: var(--dark);
+}
+
+.button-secondary {
+  background-color: var(--light-gray);
+  color: var(--dark);
+  border: 1px solid var(--border);
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.button-secondary:hover {
+  background-color: var(--border);
 }
