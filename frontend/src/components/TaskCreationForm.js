@@ -555,7 +555,7 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
 
         {/* Overlap */}
         <div className="form-group">
-          <label>Overlap</label>
+          <label>Clip Overlap (s)</label>
           <input
             type="number"
             min="0"
@@ -580,7 +580,7 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
 
         {/* Worker Count */}
         <div className="form-group">
-          <label>Workers</label>
+          <label>CPU Preprocessing Workers</label>
           <input
             type="number"
             min="1"
