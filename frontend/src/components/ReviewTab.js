@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { Drawer, IconButton } from '@mui/material';
+import { Drawer, IconButton, Modal, Box, Typography } from '@mui/material';
 import { Close as CloseIcon } from '@mui/icons-material';
 import AnnotationCard from './AnnotationCard';
 import ReviewSettings from './ReviewSettings';
@@ -36,6 +36,7 @@ function ReviewTab({ drawerOpen = false }) {
   const [isFocusMode, setIsFocusMode] = useState(false);
   const [focusClipIndex, setFocusClipIndex] = useState(0);
   const [isLeftTrayOpen, setIsLeftTrayOpen] = useState(false);
+  const [isShortcutsHelpOpen, setIsShortcutsHelpOpen] = useState(false);
   const [filters, setFilters] = useState({
     annotation: { enabled: false, values: [] },
     labels: { enabled: false, values: [] },
@@ -1428,6 +1429,157 @@ function ReviewTab({ drawerOpen = false }) {
         </div>
       </Drawer>
 
+      {/* Keyboard Shortcuts Help Modal */}
+      <Modal
+        open={isShortcutsHelpOpen}
+        onClose={() => setIsShortcutsHelpOpen(false)}
+        aria-labelledby="shortcuts-help-title"
+        aria-describedby="shortcuts-help-description"
+      >
+        <Box sx={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          width: { xs: '90%', sm: 600 },
+          maxHeight: '80vh',
+          bgcolor: 'background.paper',
+          border: '1px solid var(--border)',
+          borderRadius: '8px',
+          boxShadow: 24,
+          overflow: 'auto',
+          fontFamily: 'Rokkitt, sans-serif'
+        }}>
+          <div className="shortcuts-help-modal">
+            <div className="shortcuts-help-header">
+              <Typography id="shortcuts-help-title" variant="h6" component="h2" sx={{ fontFamily: 'Rokkitt, sans-serif', fontWeight: 600 }}>
+                Keyboard Shortcuts
+              </Typography>
+              <IconButton
+                onClick={() => setIsShortcutsHelpOpen(false)}
+                sx={{ color: 'var(--medium-gray)' }}
+              >
+                <CloseIcon />
+              </IconButton>
+            </div>
+            <div className="shortcuts-help-content">
+              {/* Global Shortcuts */}
+              <div className="shortcuts-section">
+                <h3>Global Shortcuts</h3>
+                <div className="shortcuts-list">
+                  <div className="shortcut-item">
+                    <kbd>Esc</kbd>
+                    <span>Toggle between Grid and Focus view</span>
+                  </div>
+                  <div className="shortcut-item">
+                    <kbd>Ctrl/Cmd</kbd> + <kbd>O</kbd>
+                    <span>Open annotation file</span>
+                  </div>
+                  <div className="shortcut-item">
+                    <kbd>Ctrl/Cmd</kbd> + <kbd>S</kbd>
+                    <span>Save annotations</span>
+                  </div>
+                  <div className="shortcut-item">
+                    <kbd>Ctrl/Cmd</kbd> + <kbd>,</kbd>
+                    <span>Open settings panel</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Grid Mode Shortcuts */}
+              <div className="shortcuts-section">
+                <h3>Grid Mode</h3>
+                <div className="shortcuts-list">
+                  <div className="shortcut-item">
+                    <kbd>Ctrl/Cmd</kbd> + <kbd>J</kbd>
+                    <span>Previous page</span>
+                  </div>
+                  <div className="shortcut-item">
+                    <kbd>Ctrl/Cmd</kbd> + <kbd>K</kbd>
+                    <span>Next page</span>
+                  </div>
+                  <div className="shortcut-item">
+                    <kbd>Ctrl/Cmd</kbd> + <kbd>Shift</kbd> + <kbd>C</kbd>
+                    <span>Toggle comments visibility</span>
+                  </div>
+                  {settings.review_mode === 'binary' && (
+                    <>
+                      <div className="shortcuts-subsection">
+                        <h4>Bulk Annotation (Binary Mode)</h4>
+                        <div className="shortcut-item">
+                          <kbd>Ctrl/Cmd</kbd> + <kbd>Shift</kbd> + <kbd>A</kbd>
+                          <span>Mark all clips on page as Yes</span>
+                        </div>
+                        <div className="shortcut-item">
+                          <kbd>Ctrl/Cmd</kbd> + <kbd>Shift</kbd> + <kbd>S</kbd>
+                          <span>Mark all clips on page as No</span>
+                        </div>
+                        <div className="shortcut-item">
+                          <kbd>Ctrl/Cmd</kbd> + <kbd>Shift</kbd> + <kbd>D</kbd>
+                          <span>Mark all clips on page as Uncertain</span>
+                        </div>
+                        <div className="shortcut-item">
+                          <kbd>Ctrl/Cmd</kbd> + <kbd>Shift</kbd> + <kbd>F</kbd>
+                          <span>Mark all clips on page as Unlabeled</span>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Focus Mode Shortcuts */}
+              <div className="shortcuts-section">
+                <h3>Focus Mode</h3>
+                <div className="shortcuts-list">
+                  <div className="shortcut-item">
+                    <kbd>Space</kbd>
+                    <span>Play/Pause audio</span>
+                  </div>
+                  <div className="shortcut-item">
+                    <kbd>J</kbd>
+                    <span>Previous clip</span>
+                  </div>
+                  <div className="shortcut-item">
+                    <kbd>K</kbd>
+                    <span>Next clip</span>
+                  </div>
+                  {settings.review_mode === 'binary' && (
+                    <>
+                      <div className="shortcuts-subsection">
+                        <h4>Binary Annotation</h4>
+                        <div className="shortcut-item">
+                          <kbd>A</kbd>
+                          <span>Mark as Yes</span>
+                        </div>
+                        <div className="shortcut-item">
+                          <kbd>S</kbd>
+                          <span>Mark as No</span>
+                        </div>
+                        <div className="shortcut-item">
+                          <kbd>D</kbd>
+                          <span>Mark as Uncertain</span>
+                        </div>
+                        <div className="shortcut-item">
+                          <kbd>F</kbd>
+                          <span>Mark as Unlabeled</span>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Note about shortcuts being enabled */}
+              <div className="shortcuts-note">
+                <p><strong>Note:</strong> Keyboard shortcuts can be disabled in the settings panel if needed.</p>
+                <p>Shortcuts will not work when typing in text fields or comment boxes.</p>
+              </div>
+            </div>
+          </div>
+        </Box>
+      </Modal>
+
       {/* Main Content Area - Full Window */}
       <div className="review-main-content">
         {/* Compact Top Toolbar */}
@@ -1620,6 +1772,15 @@ function ReviewTab({ drawerOpen = false }) {
           </div>
 
           <div className="toolbar-right">
+            {/* Keyboard Shortcuts Help Button */}
+            <button
+              onClick={() => setIsShortcutsHelpOpen(true)}
+              className="toolbar-btn"
+              title="Keyboard Shortcuts"
+            >
+              <span className="material-symbols-outlined">keyboard</span>
+            </button>
+            
             {/* Settings Button */}
             <button
               onClick={() => setIsSettingsPanelOpen(true)}

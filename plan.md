@@ -211,8 +211,14 @@ add toggle in inference script to embed instead or in addition to classification
 
 
 # updates for review tab
+- shortcuts help: add a button in the top bar with keyboard icon, when clicked displays a pop-up panel listing all keyboard shortcuts
 
-- Focus mode: move comments field to sit on the right side of the controls, rather than below the other controls. Use the full width for the controls + comment field. 
+
+- grid mode resizing is not working properly: maybe remove image resizing options? 
+
+
+- Focus mode: spectrograms are sometimes loaded as small sizes rather than as the size specified in the focus mode spectrogram size settings
+- Focus mode: move comments field to sit on the right side of the controls, rather than below the other controls. Use the full width for the controls + comment field. Make all of the controls and buttons fit into a compact area
 
 - review-content focus-mode and review-content grid-mode divs are taking up space even when they are empty. This causes the "ready for annotation review" text to display far down the page under the empty but large grid-mode div. It might also be the reason that there is always a scroll bar even when the page is not full
 

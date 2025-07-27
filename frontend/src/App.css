@@ -2321,6 +2321,7 @@ button:disabled {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  padding: 5px
 }
 
 .file-info {
@@ -3107,10 +3108,13 @@ button:disabled {
 }
 
 .focus-spectrogram-image {
-  max-width: 100%;
-  max-height: 600px;
+  width: auto;
   height: auto;
   display: block;
+  /* Allow image to use its natural dimensions from backend settings */
+  /* but still respect container constraints if needed */
+  max-width: none;
+  max-height: none;
 }
 
 .focus-spectrogram-placeholder {
@@ -3559,8 +3563,10 @@ button:disabled {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  max-width: 1200px;
-  margin: 0 auto;
+  width: 100%;
+  max-width: none;
+  /* Use full width available */
+  margin: 0;
   padding: 1rem;
 }
 
@@ -3748,7 +3754,8 @@ button:disabled {
 .review-toolbar {
   position: fixed;
   top: 0;
-  left: calc(64px + 1px); /* Account for collapsed navigation drawer (8 * 8px + 1px) */
+  left: calc(64px + 1px);
+  /* Account for collapsed navigation drawer (8 * 8px + 1px) */
   right: 0;
   z-index: 100;
   display: flex;
@@ -3759,9 +3766,11 @@ button:disabled {
   border-bottom: 1px solid var(--border);
   box-shadow: none;
   gap: 1rem;
-  width: calc(100% - 65px); /* Adjust width to account for left offset */
+  width: calc(100% - 65px);
+  /* Adjust width to account for left offset */
   box-sizing: border-box;
-  transition: left 0.2s ease, width 0.2s ease; /* Smooth transition when drawer expands */
+  transition: left 0.2s ease, width 0.2s ease;
+  /* Smooth transition when drawer expands */
 }
 
 /* Save Status Indicator */
@@ -3841,7 +3850,10 @@ button:disabled {
   display: flex;
   gap: 1rem;
   align-items: flex-start;
-  margin-bottom: 1rem;
+  margin-bottom: 0.5rem;
+  /* More compact spacing */
+  width: 100%;
+  /* Use full width */
 }
 
 .focus-binary-segmented-control {
@@ -3852,6 +3864,10 @@ button:disabled {
 .focus-multiclass-controls {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  /* More compact gap */
 }
 
 .focus-comments-right {
@@ -3873,7 +3889,106 @@ button:disabled {
 .focus-navigation-row {
   display: flex;
   justify-content: center;
-  margin-top: 1rem;
+  margin-top: 0.5rem;
+  /* More compact spacing */
+}
+
+/* Keyboard Shortcuts Help Modal */
+.shortcuts-help-modal {
+  font-family: 'Rokkitt', sans-serif;
+}
+
+.shortcuts-help-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem 1.5rem 0 1.5rem;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 1.5rem;
+}
+
+.shortcuts-help-content {
+  padding: 0 1.5rem 1.5rem 1.5rem;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.shortcuts-section {
+  margin-bottom: 2rem;
+}
+
+.shortcuts-section h3 {
+  color: var(--dark);
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0 0 1rem 0;
+  border-bottom: 2px solid var(--dark-accent);
+  padding-bottom: 0.5rem;
+}
+
+.shortcuts-subsection {
+  margin-top: 1.5rem;
+  margin-left: 1rem;
+}
+
+.shortcuts-subsection h4 {
+  color: var(--dark-accent);
+  font-size: 0.95rem;
+  font-weight: 500;
+  margin: 0 0 0.75rem 0;
+}
+
+.shortcuts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.shortcut-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.5rem 0;
+}
+
+.shortcut-item kbd {
+  background-color: var(--light-gray);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.25rem 0.5rem;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 0.8rem;
+  color: var(--dark);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  min-width: fit-content;
+  white-space: nowrap;
+}
+
+.shortcut-item span {
+  color: var(--dark);
+  font-size: 0.9rem;
+  line-height: 1.4;
+  flex: 1;
+}
+
+.shortcuts-note {
+  margin-top: 2rem;
+  padding: 1rem;
+  background-color: var(--light-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  border-left: 4px solid var(--dark-accent);
+}
+
+.shortcuts-note p {
+  color: var(--dark);
+  font-size: 0.85rem;
+  margin: 0.5rem 0;
+  line-height: 1.4;
+}
+
+.shortcuts-note p:last-child {
+  margin-bottom: 0;
 }
 
 /* Status Bar */
@@ -4685,7 +4800,8 @@ button:disabled {
   border: 1px solid var(--border);
   border-radius: 6px;
   overflow: hidden;
-  margin-bottom: 12px;
+  margin: 0px;
+  /* margin-bottom: 12px; */
 }
 
 .segment {
