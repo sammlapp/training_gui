@@ -184,7 +184,25 @@ def load_evaluation_data(config):
 def run_training(config):
     """Run the training process"""
     try:
+        # Log training start information
+        logger.info("="*80)
+        logger.info("BIOACOUSTICS MODEL TRAINING STARTED")
+        logger.info("="*80)
+        logger.info(f"Timestamp: {datetime.datetime.now().isoformat()}")
+        logger.info(f"Model: {config.get('model', 'Unknown')}")
+        logger.info(f"Target classes: {config.get('class_list', [])}")
+        logger.info(f"Save location: {config.get('model_save_path', 'Unknown')}")
+        
+        # Log configuration summary
         training_settings = config.get("training_settings", {})
+        logger.info(f"Training settings:")
+        logger.info(f"  - Batch size: {training_settings.get('batch_size', 32)}")
+        logger.info(f"  - Number of workers: {training_settings.get('num_workers', 4)}")
+        logger.info(f"  - Freeze feature extractor: {training_settings.get('freeze_feature_extractor', True)}")
+        logger.info(f"  - Multi-layer classifier: {training_settings.get('classifier_hidden_layer_sizes') is not None}")
+        if training_settings.get('classifier_hidden_layer_sizes'):
+            logger.info(f"  - Hidden layer sizes: {training_settings.get('classifier_hidden_layer_sizes')}")
+        logger.info("")
 
         # Load and process annotation data
         logger.info("Processing fully annotated files...")
@@ -337,14 +355,28 @@ def run_training(config):
             ),
         }
 
-        logger.info("Training completed successfully")
+        logger.info("="*80)
+        logger.info("TRAINING COMPLETED SUCCESSFULLY!")
+        logger.info("="*80)
+        logger.info(f"Model saved to: {config.get('model_save_path', 'Unknown')}")
+        logger.info(f"Training samples processed: {len(train_df)}")
+        logger.info(f"Validation samples: {len(evaluation_df)}")
+        logger.info(f"Final timestamp: {datetime.datetime.now().isoformat()}")
+        if hasattr(model, "validation_metrics") and model.validation_metrics:
+            logger.info(f"Final validation metrics: {model.validation_metrics[-1]}")
+        logger.info("="*80)
         print(json.dumps(summary))
 
     except Exception as e:
-        logger.error(f"Training failed: {e}")
+        logger.error("="*80)
+        logger.error("TRAINING FAILED!")
+        logger.error("="*80)
+        logger.error(f"Error: {e}")
+        logger.error(f"Timestamp: {datetime.datetime.now().isoformat()}")
         import traceback
-
-        logger.error(f"Traceback: {traceback.format_exc()}")
+        logger.error(f"Full traceback:")
+        logger.error(traceback.format_exc())
+        logger.error("="*80)
         error_summary = {"status": "error", "error": str(e)}
         print(json.dumps(error_summary))
         sys.exit(1)

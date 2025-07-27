@@ -55,25 +55,63 @@ function HelpTab() {
           </p>
 
           <h4 id="inference-file-selection">Audio File Selection</h4>
-          <p><strong>Select Files:</strong> Choose individual audio files to process.</p>
-          <p><strong>Select Folder:</strong> Choose a folder and the system will recursively find all audio files of the selected extensions.</p>
-          <p><strong>Glob Patterns:</strong> Use advanced pattern matching (e.g., "/path/**/*.wav") to select files across multiple directories.</p>
-          <p><strong>File List:</strong> Provide a text file with one audio file path per line.</p>
+          <p><strong>Select Files:</strong> Choose individual audio files to process. Use this for small datasets or when you need precise control over which files to analyze.</p>
+          
+          <p><strong>Select Folder:</strong> Choose a folder and the system will recursively find all audio files of the selected extensions. This is the most common option for processing entire datasets. Select which file extensions to include (WAV, MP3, FLAC, etc.).</p>
+          
+          <p><strong>Glob Patterns:</strong> Use advanced pattern matching for complex file selection across multiple directories. Examples:</p>
+          <ul>
+            <li><code>/Users/name/recordings/**/*.wav</code> - All WAV files in recordings and subdirectories</li>
+            <li><code>/data/project_&#123;2023,2024&#125;/**/*.&#123;wav,mp3&#125;</code> - WAV and MP3 files from specific years</li>
+            <li><code>/recordings/site_*/morning_*.wav</code> - Specific naming patterns</li>
+          </ul>
+          
+          <p><strong>File List:</strong> Provide a text file with one audio file path per line. Useful when you have a pre-defined list of files to process.</p>
+          <div style="background: #f5f5f5; padding: 10px; margin: 10px 0; border-radius: 4px;">
+            <strong>Example file list (filelist.txt):</strong><br/>
+            <code>/Users/name/audio/recording1.wav<br/>
+            /Users/name/audio/recording2.wav<br/>
+            /Users/name/audio/subfolder/recording3.mp3</code>
+          </div>
 
           <h4 id="inference-models">Model Selection</h4>
-          <p><strong>BirdNET:</strong> General bird species detection model trained on global bird sounds.</p>
-          <p><strong>Perch:</strong> Specialized model for bird vocalizations with high precision.</p>
-          <p><strong>HawkEars:</strong> Model focused on raptor and hawk species detection.</p>
-          <p><strong>RanaSierraeCNN:</strong> Specialized model for frog and amphibian detection.</p>
+          <p><strong>BirdNET:</strong> Global bird species detection model trained on ~3000 species. Best general-purpose option for bird detection worldwide. Outputs confidence scores for individual species.</p>
+          
+          <p><strong>Perch:</strong> Specialized bird detection model optimized for precision over recall. Uses advanced embedding techniques for robust species classification. Good for research requiring high confidence detections.</p>
+          
+          <p><strong>HawkEars:</strong> Model focused on raptor and hawk species detection, trained specifically on birds of prey vocalizations. Use for raptor migration monitoring or specialized hawk surveys.</p>
+          
+          <p><strong>RanaSierraeCNN:</strong> Specialized CNN model for frog and amphibian detection, trained on anuran calls. Designed for amphibian biodiversity monitoring and ecological surveys.</p>
 
           <h4 id="inference-overlap">Overlap Setting</h4>
-          <p><strong>Overlap:</strong> Amount of overlap between consecutive audio analysis windows (0.0-1.0). Higher values provide more thorough analysis but take longer.</p>
+          <p><strong>Overlap (0.0-1.0):</strong> Controls how much consecutive analysis windows overlap. This is crucial for not missing detections that span window boundaries.</p>
+          <ul>
+            <li><strong>0.0 (No overlap):</strong> Fastest processing, but may miss calls at window edges</li>
+            <li><strong>0.5 (50% overlap):</strong> Good balance of thoroughness and speed - recommended default</li>
+            <li><strong>0.75 (75% overlap):</strong> Very thorough detection, good for rare species</li>
+            <li><strong>0.9+ (High overlap):</strong> Maximum detection sensitivity, but significantly slower</li>
+          </ul>
+          <p><em>Recommendation:</em> Start with 0.5 for general use, increase to 0.75+ for critical surveys where missing detections is costly.</p>
 
           <h4 id="inference-batch-size">Batch Size Setting</h4>
-          <p><strong>Batch Size:</strong> Number of audio segments processed simultaneously. Higher values are faster but use more memory.</p>
+          <p><strong>Batch Size (1-32):</strong> Number of audio segments processed simultaneously in GPU memory. This is a critical PyTorch performance parameter.</p>
+          <ul>
+            <li><strong>Small batch (1-4):</strong> Safe for limited GPU memory (4-8GB), slower but stable</li>
+            <li><strong>Medium batch (8-16):</strong> Good balance for modern GPUs (8-16GB memory)</li>
+            <li><strong>Large batch (16-32):</strong> Maximum speed for high-end GPUs (16GB+ memory)</li>
+          </ul>
+          <p><em>Memory usage:</em> Larger batches require exponentially more GPU memory. If you get out-of-memory errors, reduce batch size.</p>
+          <p><em>Performance:</em> Larger batches are more efficient due to parallel processing, but benefit plateaus after optimal size for your hardware.</p>
 
           <h4 id="inference-workers">Workers Setting</h4>
-          <p><strong>Workers:</strong> Number of parallel processing threads. More workers are faster but use more CPU.</p>
+          <p><strong>Workers (1-8):</strong> Number of parallel CPU threads for data loading and preprocessing. This is PyTorch's num_workers parameter for DataLoader.</p>
+          <ul>
+            <li><strong>1 worker:</strong> Safe default, sequential processing, minimal CPU usage</li>
+            <li><strong>2-4 workers:</strong> Good for most systems, balances speed and stability</li>
+            <li><strong>6-8 workers:</strong> Maximum performance on high-end multi-core systems</li>
+          </ul>
+          <p><em>CPU consideration:</em> More workers use more CPU cores. Set to number of available cores minus 1-2 for system stability.</p>
+          <p><em>I/O bottleneck:</em> More workers help when reading from slow storage (network drives, spinning disks).</p>
 
           <h4 id="inference-subfolder-split">Subfolder Split Option</h4>
           <p><strong>Split by Subfolder:</strong> When enabled, creates separate output files for each subfolder in your audio directory structure.</p>
@@ -104,34 +142,219 @@ function HelpTab() {
           <p>Choose a pre-trained model to use as the starting point for training. The model's feature extraction layers will be used, and new classification layers will be trained on your data.</p>
 
           <h4 id="training-fully-annotated">Fully Annotated Files</h4>
-          <p><strong>Fully Annotated Files:</strong> CSV files with complete annotations for all classes. Format should be: file, start_time, end_time, then one column per class with 1/0 labels, OR file, start_time, end_time, labels, complete format.</p>
+          <p><strong>Fully Annotated Files:</strong> CSV files where every audio clip has been completely labeled for all target classes. These provide the highest quality training data.</p>
+          
+          <p><strong>Format 1 - One-hot encoding (recommended):</strong></p>
+          <div style="background: #f5f5f5; padding: 10px; margin: 10px 0; border-radius: 4px; font-family: monospace;">
+            file,start_time,end_time,robin,cardinal,blue_jay<br/>
+            recording1.wav,0.0,3.0,1,0,0<br/>
+            recording1.wav,3.0,6.0,0,1,1<br/>
+            recording2.wav,10.0,13.0,0,0,0
+          </div>
+          
+          <p><strong>Format 2 - List format:</strong></p>
+          <div style="background: #f5f5f5; padding: 10px; margin: 10px 0; border-radius: 4px; font-family: monospace;">
+            file,start_time,end_time,labels,complete<br/>
+            recording1.wav,0.0,3.0,"['robin']",complete<br/>
+            recording1.wav,3.0,6.0,"['cardinal','blue_jay']",complete<br/>
+            recording2.wav,10.0,13.0,"[]",complete
+          </div>
+          
+          <p><em>Best practice:</em> Use Format 1 for simpler processing. Each class column should contain 1 (present) or 0 (absent).</p>
 
           <h4 id="training-single-class">Single Class Annotations</h4>
-          <p><strong>Single Class Annotations:</strong> CSV files from binary classification review sessions. Format: file, start_time, end_time, annotation (yes/no/uncertain). Assign each file to a specific class from your class list.</p>
+          <p><strong>Single Class Annotations:</strong> CSV files from binary review sessions where you've labeled clips for presence/absence of a single species. These are combined to create multi-class training data.</p>
+          
+          <div style="background: #f5f5f5; padding: 10px; margin: 10px 0; border-radius: 4px; font-family: monospace;">
+            <strong>Example robin_annotations.csv:</strong><br/>
+            file,start_time,end_time,annotation<br/>
+            recording1.wav,0.0,3.0,yes<br/>
+            recording1.wav,3.0,6.0,no<br/>
+            recording1.wav,6.0,9.0,uncertain<br/>
+            recording2.wav,0.0,3.0,no
+          </div>
+          
+          <p><strong>Usage:</strong> After selecting files, assign each CSV to its corresponding class (e.g., robin_annotations.csv → "robin"). The system treats:</p>
+          <ul>
+            <li><strong>"yes":</strong> Positive example for that class</li>
+            <li><strong>"no":</strong> Negative example for that class</li>
+            <li><strong>"uncertain":</strong> Excluded from training (ambiguous)</li>
+          </ul>
+          
+          <p><em>Note:</em> Other classes are treated as weak negatives (assumed absent but not explicitly labeled).</p>
 
           <h4 id="training-background">Background Samples</h4>
-          <p><strong>Background Samples:</strong> Optional CSV of background/negative examples to improve model discrimination.</p>
+          <p><strong>Background Samples:</strong> Optional CSV file containing environmental noise or audio segments without any target species. These improve model discrimination by providing explicit negative examples.</p>
+          
+          <div style="background: #f5f5f5; padding: 10px; margin: 10px 0; border-radius: 4px; font-family: monospace;">
+            <strong>Example background_samples.csv:</strong><br/>
+            file,start_time,end_time<br/>
+            wind_noise.wav,0.0,3.0<br/>
+            rain_ambient.wav,5.0,8.0<br/>
+            urban_noise.wav,10.0,13.0<br/>
+            forest_ambient.wav,0.0,3.0
+          </div>
+          
+          <p><strong>Usage in training:</strong> Background samples are mixed with training data using "overlay" augmentation at 75% probability, helping the model learn to distinguish target species from environmental sounds.</p>
+          
+          <p><em>Best practice:</em> Include 1000-5000 background samples representing the acoustic environments where your model will be deployed.</p>
 
           <h4 id="training-class-list">Class Configuration</h4>
-          <p><strong>Class List:</strong> Comma or newline-separated list of classes to train. Will auto-populate from the first fully annotated file if left empty (using column names after file, start_time, end_time).</p>
+          <p><strong>Class List:</strong> Defines the target species or sound classes for your model. This determines the model's output structure.</p>
+          
+          <div style="background: #f5f5f5; padding: 10px; margin: 10px 0; border-radius: 4px;">
+            <strong>Example formats:</strong><br/>
+            <strong>Comma-separated:</strong> robin, cardinal, blue_jay, wood_thrush<br/>
+            <strong>Line-separated:</strong><br/>
+            robin<br/>
+            cardinal<br/>
+            blue_jay<br/>
+            wood_thrush
+          </div>
+          
+          <p><strong>Auto-population:</strong> If left empty, the system extracts class names from the first fully annotated file using column headers (after file, start_time, end_time).</p>
+          
+          <p><strong>Important considerations:</strong></p>
+          <ul>
+            <li>Class names must exactly match those used in annotation files</li>
+            <li>Order affects model output structure but not performance</li>
+            <li>More classes require more training data for good performance</li>
+            <li>Consider grouping rare species or using hierarchical classification</li>
+          </ul>
 
           <h4 id="training-root-folder">Root Audio Folder</h4>
-          <p><strong>Root Audio Folder:</strong> Base directory for resolving relative file paths in your annotation CSVs.</p>
+          <p><strong>Root Audio Folder:</strong> Base directory for resolving relative file paths in your annotation CSVs. This enables portable annotation files that work across different systems.</p>
+          
+          <p><strong>Example usage:</strong></p>
+          <div style="background: #f5f5f5; padding: 10px; margin: 10px 0; border-radius: 4px;">
+            <strong>If your CSV contains:</strong><br/>
+            <code>site1/morning.wav,0.0,3.0,1,0,0</code><br/><br/>
+            <strong>And root folder is:</strong><br/>
+            <code>/Users/researcher/audio_data/</code><br/><br/>
+            <strong>System looks for:</strong><br/>
+            <code>/Users/researcher/audio_data/site1/morning.wav</code>
+          </div>
+          
+          <p><strong>When to use:</strong></p>
+          <ul>
+            <li>CSV files contain relative paths (recommended for portability)</li>
+            <li>Sharing annotation files between team members</li>
+            <li>Moving datasets between different computers/servers</li>
+          </ul>
+          
+          <p><em>Alternative:</em> Use absolute paths in CSV files if you prefer, then leave this field empty.</p>
 
           <h4 id="training-evaluation">Evaluation File</h4>
-          <p><strong>Evaluation File:</strong> Optional separate dataset for model evaluation. Same format as training data.</p>
+          <p><strong>Evaluation File:</strong> Optional separate dataset for unbiased model evaluation. Uses same format as fully annotated training files.</p>
+          
+          <p><strong>Purpose:</strong> Provides independent test set for assessing true model performance. Without this, the system uses 80/20 train/validation split from your training data.</p>
+          
+          <div style="background: #f5f5f5; padding: 10px; margin: 10px 0; border-radius: 4px; font-family: monospace;">
+            <strong>Example evaluation.csv:</strong><br/>
+            file,start_time,end_time,robin,cardinal,blue_jay<br/>
+            test_site1.wav,0.0,3.0,1,0,0<br/>
+            test_site1.wav,3.0,6.0,0,1,0<br/>
+            test_site2.wav,10.0,13.0,0,0,1
+          </div>
+          
+          <p><strong>Best practices:</strong></p>
+          <ul>
+            <li>Use 10-20% of your total annotated data for evaluation</li>
+            <li>Ensure evaluation data represents the same conditions as deployment</li>
+            <li>Include all target classes in evaluation set</li>
+            <li>Consider geographic or temporal separation from training data</li>
+          </ul>
 
           <h4 id="training-batch-size">Batch Size Setting</h4>
-          <p><strong>Batch Size:</strong> Number of samples processed together during training. Larger batches train faster but require more memory.</p>
+          <p><strong>Batch Size (8-64):</strong> Number of audio samples processed together in each training step. This is a fundamental PyTorch hyperparameter affecting both performance and model behavior.</p>
+          
+          <p><strong>Size recommendations:</strong></p>
+          <ul>
+            <li><strong>8-16:</strong> Small datasets (&lt;1000 samples), limited GPU memory</li>
+            <li><strong>16-32:</strong> Medium datasets (1000-10000 samples), standard choice</li>
+            <li><strong>32-64:</strong> Large datasets (&gt;10000 samples), high-end hardware</li>
+          </ul>
+          
+          <p><strong>Trade-offs:</strong></p>
+          <ul>
+            <li><strong>Larger batches:</strong> More stable gradients, faster training, need more memory</li>
+            <li><strong>Smaller batches:</strong> More noise in gradients (can help escape local minima), less memory</li>
+          </ul>
+          
+          <p><em>Rule of thumb:</em> Start with 32, reduce if you get out-of-memory errors, increase if training is slow and you have spare GPU memory.</p>
 
           <h4 id="training-workers">Workers Setting</h4>
-          <p><strong>Workers:</strong> Number of parallel data loading processes.</p>
+          <p><strong>Workers (0-8):</strong> Number of parallel processes for loading and preprocessing training data. This is PyTorch's DataLoader num_workers parameter.</p>
+          
+          <ul>
+            <li><strong>0:</strong> Single-threaded data loading, safest but slowest</li>
+            <li><strong>2-4:</strong> Good balance for most systems</li>
+            <li><strong>4-8:</strong> High-performance systems with fast storage</li>
+          </ul>
+          
+          <p><strong>Optimization guidelines:</strong></p>
+          <ul>
+            <li>Set to number of CPU cores available for training (typically total cores - 2)</li>
+            <li>Reduce if you experience system instability or memory issues</li>
+            <li>Increase if GPU utilization is low (GPU waiting for data)</li>
+          </ul>
+          
+          <p><em>Performance tip:</em> Monitor GPU utilization during training. If it's below 90%, try increasing workers.</p>
 
           <h4 id="training-freeze">Freeze Feature Extractor</h4>
-          <p><strong>Freeze Feature Extractor:</strong> When enabled, only trains the final classification layers. Recommended for small datasets to prevent overfitting.</p>
+          <p><strong>Freeze Feature Extractor:</strong> Controls which parts of the neural network are updated during training. This is a crucial transfer learning decision.</p>
+          
+          <p><strong>Enabled (Recommended for most users):</strong></p>
+          <ul>
+            <li>Only trains the final classification layers</li>
+            <li>Preserves pre-trained feature representations</li>
+            <li>Faster training, less GPU memory, prevents overfitting</li>
+            <li>Best for small datasets (&lt;5000 samples)</li>
+          </ul>
+          
+          <p><strong>Disabled (Advanced users):</strong></p>
+          <ul>
+            <li>Fine-tunes the entire network including feature extractor</li>
+            <li>Can achieve better performance with sufficient data</li>
+            <li>Requires large datasets (&gt;10000 samples) to avoid overfitting</li>
+            <li>Much slower training, needs more GPU memory</li>
+          </ul>
+          
+          <p><em>Decision guide:</em> Keep enabled unless you have &gt;10,000 labeled samples and understand the risks of overfitting.</p>
 
+          <h4 id="training-multi-layer">Multi-layer Classifier</h4>
+          <p><strong>Multi-layer Classifier:</strong> Controls the architecture of the final classification head. This affects model capacity and learning ability.</p>
+          
+          <p><strong>Disabled (Single layer, default):</strong></p>
+          <ul>
+            <li>Simple linear layer: features → classes</li>
+            <li>Fastest training, least overfitting risk</li>
+            <li>Sufficient for most bioacoustic classification tasks</li>
+          </ul>
+          
+          <p><strong>Enabled (Multi-layer):</strong></p>
+          <ul>
+            <li>Deep classifier: features → hidden layers → classes</li>
+            <li>More expressive, can learn complex decision boundaries</li>
+            <li>Useful for difficult discrimination tasks</li>
+          </ul>
+          
+          <p><strong>Hidden Layer Sizes:</strong> Comma-separated numbers defining the architecture. Examples:</p>
+          <ul>
+            <li><strong>"100":</strong> Single hidden layer with 100 neurons</li>
+            <li><strong>"100,50":</strong> Two layers: 100 → 50 → classes</li>
+            <li><strong>"200,100,50":</strong> Three layers with decreasing size</li>
+          </ul>
+          
+          <p><em>Guideline:</em> Start with single layer. Try "100" or "100,50" if single layer performance plateaus.</p>
+          
           <h4 id="training-output">Model Output</h4>
-          <p><strong>Save Location:</strong> Directory where the trained model and training logs will be saved.</p>
+          <p><strong>Save Location:</strong> Directory where the trained model, configuration, and training logs will be saved. The system creates a job folder with:</p>
+          <ul>
+            <li><strong>trained_model.pth:</strong> PyTorch model file for inference</li>
+            <li><strong>training_config.json:</strong> Complete training configuration backup</li>
+            <li><strong>Training logs:</strong> Loss curves, validation metrics, debugging info</li>
+          </ul>
         </div>
       )
     },
@@ -149,7 +372,16 @@ function HelpTab() {
 
           <h4>Data Loading</h4>
           <p><strong>Load Results:</strong> Import CSV files containing inference results with detection scores and metadata.</p>
-          <p><strong>File Format:</strong> Expected columns include file paths, start/end times, and confidence scores for each detected class.</p>
+          
+          <p><strong>Expected CSV format from inference:</strong></p>
+          <div style="background: #f5f5f5; padding: 10px; margin: 10px 0; border-radius: 4px; font-family: monospace;">
+            file,start_time,end_time,robin,cardinal,blue_jay<br/>
+            recording1.wav,0.0,3.0,0.85,0.12,0.03<br/>
+            recording1.wav,3.0,6.0,0.15,0.78,0.07<br/>
+            recording2.wav,6.0,9.0,0.02,0.05,0.93
+          </div>
+          
+          <p>Each species column contains confidence scores (0.0-1.0) indicating detection probability.</p>
 
           <h4>Visualization</h4>
           <p><strong>Score Distribution:</strong> Histograms and statistics showing the distribution of detection confidence scores.</p>
@@ -213,23 +445,54 @@ function HelpTab() {
 
           <h4>Typical Workflow</h4>
           <ol>
-            <li><strong>Inference:</strong> Run a pre-trained model on your audio files to get initial detections</li>
-            <li><strong>Explore:</strong> Load and examine the inference results to understand what was detected</li>
-            <li><strong>Review:</strong> Manually validate high-confidence detections and annotate clips for training</li>
-            <li><strong>Training:</strong> Use your annotations to train a custom model specialized for your data</li>
-            <li><strong>Iteration:</strong> Run inference with your trained model and repeat the cycle to improve performance</li>
+            <li><strong>Inference:</strong> Run a pre-trained model (BirdNET, Perch, etc.) on your audio files to get initial detections</li>
+            <li><strong>Explore:</strong> Load and examine the inference results to understand detection patterns and confidence distributions</li>
+            <li><strong>Review:</strong> Manually validate high-confidence detections and annotate clips to create training datasets</li>
+            <li><strong>Training:</strong> Use your annotations to fine-tune models specialized for your target species and acoustic environment</li>
+            <li><strong>Iteration:</strong> Deploy your trained model via inference and repeat the cycle to improve performance</li>
           </ol>
 
-          <h4>File Formats</h4>
-          <p><strong>Audio:</strong> Supported formats include WAV, MP3, FLAC, OGG, M4A, AAC, WMA, AIFF</p>
-          <p><strong>Annotations:</strong> CSV files with standardized column formats for different annotation types</p>
-          <p><strong>Results:</strong> CSV files with detection scores and metadata for each analyzed audio segment</p>
+          <h4>File Formats Supported</h4>
+          <p><strong>Audio formats:</strong> WAV (recommended), MP3, FLAC, OGG, M4A, AAC, WMA, AIFF</p>
+          <ul>
+            <li><strong>WAV:</strong> Uncompressed, best quality for analysis</li>
+            <li><strong>FLAC:</strong> Lossless compression, good balance of quality and size</li>
+            <li><strong>MP3:</strong> Compressed, acceptable for many applications but may affect model performance</li>
+          </ul>
+          
+          <p><strong>CSV file specifications:</strong></p>
+          <ul>
+            <li><strong>Inference results:</strong> file, start_time, end_time, [confidence columns]</li>
+            <li><strong>Annotations:</strong> file, start_time, end_time, [class labels or annotation field]</li>
+            <li><strong>File lists:</strong> One audio file path per line (plain text)</li>
+          </ul>
 
           <h4>Configuration Management</h4>
-          <p>All tabs support saving and loading configuration files to preserve your analysis parameters and enable reproducible workflows.</p>
+          <p>All tabs support saving and loading JSON configuration files to preserve your analysis parameters and enable reproducible workflows. This includes:</p>
+          <ul>
+            <li><strong>Model parameters:</strong> Batch size, overlap, worker counts</li>
+            <li><strong>File selections:</strong> Input files, output directories, patterns</li>
+            <li><strong>Training settings:</strong> Learning rates, architectures, data augmentation</li>
+          </ul>
+          
+          <p><em>Best practice:</em> Save configurations for each project to ensure consistent analysis parameters.</p>
 
-          <h4>Task Monitoring</h4>
-          <p>Long-running processes (inference and training) are managed through a task queue system with progress monitoring, cancellation support, and error reporting.</p>
+          <h4>Task Monitoring & Performance</h4>
+          <p>Long-running processes (inference and training) are managed through a task queue system with:</p>
+          <ul>
+            <li><strong>Progress monitoring:</strong> Real-time updates on processing status</li>
+            <li><strong>Resource management:</strong> Automatic GPU/CPU utilization optimization</li>
+            <li><strong>Error reporting:</strong> Detailed logs for troubleshooting failures</li>
+            <li><strong>Background processing:</strong> Continue working while tasks run</li>
+          </ul>
+          
+          <p><strong>Performance tips:</strong></p>
+          <ul>
+            <li>Start with small test datasets to optimize parameters</li>
+            <li>Monitor GPU/CPU usage to identify bottlenecks</li>
+            <li>Use SSD storage for better I/O performance</li>
+            <li>Batch process large datasets instead of individual files</li>
+          </ul>
         </div>
       )
     }
@@ -270,9 +533,27 @@ function HelpTab() {
       <style jsx>{`
         .help-tab {
           padding: 20px;
-          max-width: 800px;
+          max-width: 900px;
           margin: 0 auto;
           line-height: 1.6;
+        }
+        
+        .help-tab code {
+          background: #e8f4f8;
+          padding: 2px 4px;
+          border-radius: 3px;
+          font-family: 'Courier New', monospace;
+          font-size: 0.9em;
+        }
+        
+        .help-tab ul li {
+          margin-bottom: 6px;
+        }
+        
+        .help-tab em {
+          color: #0066cc;
+          font-style: normal;
+          font-weight: 500;
         }
 
         .help-header {

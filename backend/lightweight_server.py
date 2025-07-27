@@ -287,20 +287,49 @@ def start_training_process(job_id, config_path, env_python_path):
         if not os.path.exists(config_path):
             return {"status": "error", "error": f"Config file not found: {config_path}"}
         
+        # Load config to get log file path
+        log_file_path = None
+        try:
+            import json
+            with open(config_path, 'r') as f:
+                config_data = json.load(f)
+                log_file_path = config_data.get('log_file_path')
+        except Exception as e:
+            logger.warning(f"Could not read log_file_path from config: {e}")
+        
         # Run train_model.py with the specified Python environment
         training_script = os.path.join(os.path.dirname(__file__), "scripts", "train_model.py")
         cmd = [env_python_path, training_script, "--config", config_path]
         
         logger.info(f"Running command: {' '.join(cmd)}")
+        if log_file_path:
+            logger.info(f"Redirecting output to: {log_file_path}")
+        
+        # Prepare output redirection
+        if log_file_path:
+            # Ensure the directory exists
+            os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
+            # Open log file for writing
+            log_file = open(log_file_path, 'w')
+            stdout_target = log_file
+            stderr_target = subprocess.STDOUT  # Redirect stderr to stdout (which goes to log file)
+        else:
+            # Fallback to PIPE if no log file specified
+            stdout_target = subprocess.PIPE
+            stderr_target = subprocess.PIPE
         
         # Start the process (non-blocking)
         process = subprocess.Popen(
             cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            stdout=stdout_target,
+            stderr=stderr_target,
             text=True,
             cwd=os.path.dirname(os.path.abspath(__file__))
         )
+        
+        # Store log file handle with process if we opened one
+        if log_file_path:
+            process._log_file = log_file
         
         return {
             "status": "started",
@@ -330,7 +359,15 @@ def check_training_status(process):
                 "message": "Training process is still running"
             }
         else:
-            # Process has completed, get output
+            # Process has completed
+            # Close log file if it was opened
+            if hasattr(process, '_log_file'):
+                try:
+                    process._log_file.close()
+                except:
+                    pass
+            
+            # Get output - may be None if redirected to file
             stdout, stderr = process.communicate()
             
             logger.info(f"Training process completed with exit code: {return_code}")
@@ -343,8 +380,8 @@ def check_training_status(process):
                 return {
                     "status": "completed", 
                     "message": "Training completed successfully", 
-                    "output": stdout,
-                    "stdout": stdout,
+                    "output": stdout or "Output redirected to log file",
+                    "stdout": stdout or "Output redirected to log file",
                     "stderr": stderr if stderr else "",
                     "exit_code": return_code
                 }
@@ -353,8 +390,8 @@ def check_training_status(process):
                     "status": "failed", 
                     "error": f"Training failed with exit code {return_code}", 
                     "exit_code": return_code,
-                    "stdout": stdout if stdout else "",
-                    "stderr": stderr if stderr else ""
+                    "stdout": stdout or "Output redirected to log file",
+                    "stderr": stderr or "Error output redirected to log file"
                 }
                 
     except Exception as e:

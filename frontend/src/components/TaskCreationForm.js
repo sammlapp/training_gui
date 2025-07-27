@@ -538,10 +538,15 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
             value={config.model}
             onChange={(e) => setConfig(prev => ({ ...prev, model: e.target.value }))}
           >
-            <option value="BirdNET">BirdNET</option>
-            <option value="Perch">Perch</option>
             <option value="HawkEars">HawkEars</option>
-            <option value="RanaSierraeCNN">RanaSierraeCNN</option>
+            <option value="HawkEars_Embedding">HawkEars Embed/Transfer Learning</option>
+            <option value="HawkEars_Low Band">Ruffed & Spruce Grouse (HawkEars Low-band)</option>
+            <option value="BirdNET">BirdNET Global bird species classifier</option>
+            <option value="BirdSetEfficientNetB1">BirdSet Global bird species classifier EfficientNetB1</option>
+            <option value="BirdSetConvNeXT">BirdSet Global bird species classifier ConvNext</option>
+            {/* <option value="Perch">Perch Global bird species classifier </option> */}
+            {/* haven't created TF environments yet */}
+
           </select>
         </div>
 

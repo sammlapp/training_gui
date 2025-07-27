@@ -368,6 +368,7 @@ class TaskManager {
       const jobFolder = config.save_location ? `${config.save_location}/${jobFolderName}` : '';
       const modelSavePath = jobFolder ? `${jobFolder}/trained_model.pth` : '';
       const configJsonPath = jobFolder ? `${jobFolder}/${task.name}_${task.id}.json` : '';
+      const logFilePath = jobFolder ? `${jobFolder}/train_log.txt` : '';
 
       // Create temporary config file
       const tempConfigPath = `/tmp/training_config_${processId}.json`;
@@ -382,6 +383,7 @@ class TaskManager {
         model_save_path: modelSavePath,
         job_folder: jobFolder,
         config_output_path: configJsonPath,
+        log_file_path: logFilePath,
         training_settings: {
           batch_size: config.batch_size || 32,
           num_workers: config.num_workers || 4,
