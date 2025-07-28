@@ -275,15 +275,7 @@ def main():
         Path(config_save_path).parent.mkdir(parents=True, exist_ok=True)
         with open(config_save_path, "w") as f:
             json.dump(config_data, f, indent=4)
-
-        # potentially split up inference task into smaller sequential subtasks
-        # if config_data says to split by subfolder:
-        # files_subsets = .... # dictionary groups into folder name : file list
-        # for files, names in files_subsets.items():
-        #   output_file = ... # config's output_dir +
-        #   predictions = model.predict(files_subset)
-        #   save_results(predictions,output_file)
-
+            
         # Run inference
         logger.info(f"Starting inference with model: {model_name}")
         predictions = run_inference(files, model, inference_config)

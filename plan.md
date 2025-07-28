@@ -296,9 +296,10 @@ option to split up inference tasks into one task per subfolder
 - TODO: smart segmenting into subtasks for large prediction tasks, with intermittent saving
 
 Job management and display bugs:
-- jobs used to show as completed, but now even when an inference job is actually finished, it shows as running indefinitely
+- as with training, the outputs of the inference script should be logged to a file in the job folder. This will help with debugging
+- want to be have the system process ID (rather than internal job ID) in the task pane - is this possible?
+- jobs used to show as completed once they finished, but now even when an inference job is actually finished, it shows as running indefinitely
 - "Inference running..." is shown for canceled tasks. 
-- as with training, the outputs of the inference script should be logged to a file in the job folder
 
 
 # Explore tab updates

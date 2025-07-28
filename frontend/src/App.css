@@ -5204,7 +5204,7 @@ button:disabled {
   right: 0;
   background: var(--dark);
   color: var(--white);
-  padding: 8px 20px;
+  padding: 1px 10px;
   display: flex;
   align-items: center;
   z-index: 1000;

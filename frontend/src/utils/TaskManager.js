@@ -44,7 +44,8 @@ class TaskManager {
       completed: null,
       progress: '',
       result: null,
-      processId: null
+      processId: null,
+      systemPid: null
     };
 
     this.tasks.set(task.id, task);
@@ -199,6 +200,7 @@ class TaskManager {
       const jobFolder = config.output_dir ? `${config.output_dir}/${jobFolderName}` : '';
       const outputCsvPath = jobFolder ? `${jobFolder}/predictions.csv` : '';
       const configJsonPath = jobFolder ? `${jobFolder}/${task.name}_${task.id}.json` : '';
+      const logFilePath = jobFolder ? `${jobFolder}/inference_log.txt` : '';
 
       // Create temporary config file
       const tempConfigPath = `/tmp/inference_config_${processId}.json`;
@@ -211,6 +213,7 @@ class TaskManager {
         output_file: outputCsvPath,
         job_folder: jobFolder,
         config_output_path: configJsonPath,
+        log_file_path: logFilePath,
         inference_settings: {
           clip_overlap: config.overlap || 0.0,
           batch_size: config.batch_size || 1,
@@ -328,7 +331,12 @@ class TaskManager {
           
           // Update task progress based on status
           if (result.status === 'running') {
-            this.updateTask(taskId, { progress: 'Inference running...' });
+            // Store system PID if available
+            const updates = { progress: 'Inference running...' };
+            if (result.system_pid) {
+              updates.systemPid = result.system_pid;
+            }
+            this.updateTask(taskId, updates);
             // Continue polling
             setTimeout(poll, pollInterval);
           } else if (result.status === 'completed') {
@@ -337,6 +345,9 @@ class TaskManager {
           } else if (result.status === 'failed') {
             this.updateTask(taskId, { progress: 'Inference failed' });
             resolve(result); // Resolve with failed status, let caller handle error
+          } else if (result.status === 'cancelled') {
+            this.updateTask(taskId, { progress: 'Cancelled by user' });
+            resolve(result); // Resolve with cancelled status - stop polling
           } else {
             // Unknown status, treat as error
             reject(new Error(`Unknown inference status: ${result.status}`));
@@ -504,7 +515,12 @@ class TaskManager {
           
           // Update task progress based on status
           if (result.status === 'running') {
-            this.updateTask(taskId, { progress: 'Training running...' });
+            // Store system PID if available
+            const updates = { progress: 'Training running...' };
+            if (result.system_pid) {
+              updates.systemPid = result.system_pid;
+            }
+            this.updateTask(taskId, updates);
             // Continue polling
             setTimeout(poll, pollInterval);
           } else if (result.status === 'completed') {
@@ -513,6 +529,9 @@ class TaskManager {
           } else if (result.status === 'failed') {
             this.updateTask(taskId, { progress: 'Training failed' });
             resolve(result); // Resolve with failed status, let caller handle error
+          } else if (result.status === 'cancelled') {
+            this.updateTask(taskId, { progress: 'Cancelled by user' });
+            resolve(result); // Resolve with cancelled status - stop polling
           } else {
             // Unknown status, treat as error
             reject(new Error(`Unknown training status: ${result.status}`));
@@ -527,14 +546,40 @@ class TaskManager {
     });
   }
 
-  cancelTask(taskId) {
+  async cancelTask(taskId) {
     const task = this.getTask(taskId);
     if (!task) return false;
 
     if (task.status === TASK_STATUS.RUNNING) {
-      // Cancel the running process
-      if (task.processId && window.electronAPI) {
-        window.electronAPI.killPythonProcess(task.processId);
+      // Cancel the running process via backend API
+      if (task.processId) {
+        try {
+          const endpoint = task.type === TASK_TYPE.TRAINING 
+            ? `http://localhost:8000/training/cancel/${task.processId}`
+            : `http://localhost:8000/inference/cancel/${task.processId}`;
+          
+          const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            }
+          });
+          
+          if (!response.ok) {
+            console.error(`Failed to cancel ${task.type} job via backend:`, response.statusText);
+          }
+        } catch (error) {
+          console.error(`Error cancelling ${task.type} job via backend:`, error);
+        }
+      }
+
+      // Fallback to Electron API if available (for compatibility)
+      if (task.systemPid && window.electronAPI) {
+        try {
+          window.electronAPI.killPythonProcess(task.systemPid);
+        } catch (error) {
+          console.error('Error killing process via Electron API:', error);
+        }
       }
     }
 

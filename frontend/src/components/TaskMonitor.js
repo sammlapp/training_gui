@@ -170,7 +170,7 @@ function TaskMonitor({ taskManager }) {
 
                 <div className="task-meta">
                   <div>Created: {new Date(task.created).toLocaleString()}</div>
-                  <div>Job ID: {task.id}</div>
+                  <div>Process ID: {task.systemPid || task.id}</div>
                   {task.started && (
                     <div>Duration: {formatDuration(task.started, task.completed)}</div>
                   )}

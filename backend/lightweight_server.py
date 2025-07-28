@@ -196,25 +196,55 @@ def start_inference_process(job_id, config_path, env_python_path):
         if not os.path.exists(config_path):
             return {"status": "error", "error": f"Config file not found: {config_path}"}
         
+        # Load config to get log file path
+        log_file_path = None
+        try:
+            import json
+            with open(config_path, 'r') as f:
+                config_data = json.load(f)
+                log_file_path = config_data.get('log_file_path')
+        except Exception as e:
+            logger.warning(f"Could not read log_file_path from config: {e}")
+        
         # Run inference.py with the specified Python environment
         inference_script = os.path.join(os.path.dirname(__file__), "scripts", "inference.py")
         cmd = [env_python_path, inference_script, "--config", config_path]
         
         logger.info(f"Running command: {' '.join(cmd)}")
+        if log_file_path:
+            logger.info(f"Redirecting output to: {log_file_path}")
+        
+        # Prepare output redirection
+        if log_file_path:
+            # Ensure the directory exists
+            os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
+            # Open log file for writing
+            log_file = open(log_file_path, 'w')
+            stdout_target = log_file
+            stderr_target = subprocess.STDOUT  # Redirect stderr to stdout (which goes to log file)
+        else:
+            # Fallback to PIPE if no log file specified
+            stdout_target = subprocess.PIPE
+            stderr_target = subprocess.PIPE
         
         # Start the process (non-blocking)
         process = subprocess.Popen(
             cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            stdout=stdout_target,
+            stderr=stderr_target,
             text=True,
             cwd=os.path.dirname(os.path.abspath(__file__))
         )
+        
+        # Store log file handle with process if we opened one
+        if log_file_path:
+            process._log_file = log_file
         
         return {
             "status": "started",
             "job_id": job_id,
             "process": process,
+            "system_pid": process.pid,
             "command": " ".join(cmd),
             "message": "Inference process started successfully"
         }
@@ -222,7 +252,7 @@ def start_inference_process(job_id, config_path, env_python_path):
     except Exception as e:
         return {"status": "error", "error": str(e)}
 
-def check_inference_status(process):
+def check_inference_status(process, job_info=None):
     """Check status of running inference process"""
     try:
         if process is None:
@@ -238,7 +268,15 @@ def check_inference_status(process):
                 "message": "Inference process is still running"
             }
         else:
-            # Process has completed, get output
+            # Process has completed
+            # Close log file if it was opened
+            if hasattr(process, '_log_file'):
+                try:
+                    process._log_file.close()
+                except:
+                    pass
+            
+            # Get output - may be None if redirected to file
             stdout, stderr = process.communicate()
             
             logger.info(f"Inference process completed with exit code: {return_code}")
@@ -247,12 +285,19 @@ def check_inference_status(process):
             if stderr:
                 logger.error(f"Stderr: {stderr[:500]}...")  # Log first 500 chars
             
-            if return_code == 0:
+            # Check if job was cancelled before checking exit code
+            if job_info and job_info.get("status") == "cancelled":
+                return {
+                    "status": "cancelled",
+                    "message": "Inference was cancelled by user",
+                    "exit_code": return_code
+                }
+            elif return_code == 0:
                 return {
                     "status": "completed", 
                     "message": "Inference completed successfully", 
-                    "output": stdout,
-                    "stdout": stdout,
+                    "output": stdout or "Output redirected to log file",
+                    "stdout": stdout or "Output redirected to log file",
                     "stderr": stderr if stderr else "",
                     "exit_code": return_code
                 }
@@ -261,8 +306,8 @@ def check_inference_status(process):
                     "status": "failed", 
                     "error": f"Inference failed with exit code {return_code}", 
                     "exit_code": return_code,
-                    "stdout": stdout if stdout else "",
-                    "stderr": stderr if stderr else ""
+                    "stdout": stdout or "Output redirected to log file",
+                    "stderr": stderr or "Error output redirected to log file"
                 }
                 
     except Exception as e:
@@ -335,6 +380,7 @@ def start_training_process(job_id, config_path, env_python_path):
             "status": "started",
             "job_id": job_id,
             "process": process,
+            "system_pid": process.pid,
             "command": " ".join(cmd),
             "message": "Training process started successfully"
         }
@@ -343,7 +389,7 @@ def start_training_process(job_id, config_path, env_python_path):
         return {"status": "error", "error": str(e)}
 
 
-def check_training_status(process):
+def check_training_status(process, job_info=None):
     """Check status of running training process"""
     try:
         if process is None:
@@ -376,7 +422,14 @@ def check_training_status(process):
             if stderr:
                 logger.error(f"Stderr: {stderr[:500]}...")  # Log first 500 chars
             
-            if return_code == 0:
+            # Check if job was cancelled before checking exit code
+            if job_info and job_info.get("status") == "cancelled":
+                return {
+                    "status": "cancelled",
+                    "message": "Training was cancelled by user",
+                    "exit_code": return_code
+                }
+            elif return_code == 0:
                 return {
                     "status": "completed", 
                     "message": "Training completed successfully", 
@@ -592,10 +645,12 @@ class LightweightServer:
         self.app.router.add_post("/env/setup", self.setup_env)
         self.app.router.add_post("/inference/run", self.run_inference)
         self.app.router.add_get("/inference/status/{job_id}", self.get_inference_status)
+        self.app.router.add_post("/inference/cancel/{job_id}", self.cancel_inference)
         
         # Training routes
         self.app.router.add_post("/training/run", self.run_training)
         self.app.router.add_get("/training/status/{job_id}", self.get_training_status)
+        self.app.router.add_post("/training/cancel/{job_id}", self.cancel_training)
         
         # File counting routes
         self.app.router.add_post("/files/count-glob", self.count_files_glob)
@@ -895,6 +950,7 @@ class LightweightServer:
                     "process": result["process"],
                     "status": "running",
                     "job_id": job_id,
+                    "system_pid": result["system_pid"],
                     "command": result["command"],
                     "started_at": asyncio.get_event_loop().time()
                 }
@@ -922,21 +978,42 @@ class LightweightServer:
             job_info = self.running_jobs[job_id]
             process = job_info["process"]
             
-            # Check current status
-            status_result = check_inference_status(process)
+            # Check if job is already in a final state
+            if job_info["status"] in ["cancelled", "completed", "failed"]:
+                # Job is already finished, don't check process status again
+                if job_info["status"] == "cancelled":
+                    status_result = {
+                        "status": "cancelled",
+                        "message": "Job was cancelled by user"
+                    }
+                elif job_info["status"] == "completed":
+                    status_result = {
+                        "status": "completed",
+                        "message": "Inference completed successfully"
+                    }
+                else:  # failed
+                    status_result = {
+                        "status": "failed",
+                        "message": "Inference failed"
+                    }
+            else:
+                # Check current status
+                status_result = check_inference_status(process, job_info)
+                
+                # Update job info
+                job_info["status"] = status_result["status"]
             
-            # Update job info
-            job_info["status"] = status_result["status"]
             job_info["last_checked"] = asyncio.get_event_loop().time()
             
-            # If completed or failed, add final results and optionally clean up
-            if status_result["status"] in ["completed", "failed"]:
+            # If completed, failed, or cancelled, add final results and optionally clean up
+            if status_result["status"] in ["completed", "failed", "cancelled"]:
                 job_info.update(status_result)
                 # Keep job info for a while so frontend can retrieve results
                 # Could add cleanup logic here if needed
             
             return web.json_response({
                 "job_id": job_id,
+                "system_pid": job_info.get("system_pid"),
                 "started_at": job_info["started_at"],
                 "last_checked": job_info["last_checked"],
                 **status_result
@@ -944,6 +1021,55 @@ class LightweightServer:
             
         except Exception as e:
             logger.error(f"Error checking inference status: {e}")
+            return web.json_response({"status": "error", "error": str(e)}, status=500)
+
+    async def cancel_inference(self, request):
+        """Cancel a running inference job"""
+        try:
+            job_id = request.match_info['job_id']
+            
+            if job_id not in self.running_jobs:
+                return web.json_response({"status": "error", "error": f"Job {job_id} not found"}, status=404)
+            
+            job_info = self.running_jobs[job_id]
+            process = job_info["process"]
+            
+            try:
+                # Terminate the process
+                process.terminate()
+                # Give it a moment to terminate gracefully
+                import time
+                time.sleep(0.5)
+                
+                # If still running, force kill
+                if process.poll() is None:
+                    process.kill()
+                
+                # Close log file if it was opened
+                if hasattr(process, '_log_file'):
+                    try:
+                        process._log_file.close()
+                    except:
+                        pass
+                
+                # Update job status
+                job_info["status"] = "cancelled"
+                job_info["cancelled_at"] = asyncio.get_event_loop().time()
+                
+                logger.info(f"Inference job {job_id} cancelled successfully")
+                
+                return web.json_response({
+                    "status": "cancelled",
+                    "job_id": job_id,
+                    "message": "Inference job cancelled successfully"
+                })
+                
+            except Exception as e:
+                logger.error(f"Error cancelling inference job {job_id}: {e}")
+                return web.json_response({"status": "error", "error": f"Failed to cancel job: {str(e)}"}, status=500)
+            
+        except Exception as e:
+            logger.error(f"Error in cancel_inference: {e}")
             return web.json_response({"status": "error", "error": str(e)}, status=500)
 
     # Training Process Management Routes
@@ -980,6 +1106,7 @@ class LightweightServer:
                     "process": result["process"],
                     "status": "running",
                     "job_id": job_id,
+                    "system_pid": result["system_pid"],
                     "command": result["command"],
                     "started_at": asyncio.get_event_loop().time(),
                     "job_type": "training"
@@ -1008,21 +1135,42 @@ class LightweightServer:
             job_info = self.running_jobs[job_id]
             process = job_info["process"]
             
-            # Check current status
-            status_result = check_training_status(process)
+            # Check if job is already in a final state
+            if job_info["status"] in ["cancelled", "completed", "failed"]:
+                # Job is already finished, don't check process status again
+                if job_info["status"] == "cancelled":
+                    status_result = {
+                        "status": "cancelled",
+                        "message": "Job was cancelled by user"
+                    }
+                elif job_info["status"] == "completed":
+                    status_result = {
+                        "status": "completed",
+                        "message": "Training completed successfully"
+                    }
+                else:  # failed
+                    status_result = {
+                        "status": "failed",
+                        "message": "Training failed"
+                    }
+            else:
+                # Check current status
+                status_result = check_training_status(process, job_info)
+                
+                # Update job info
+                job_info["status"] = status_result["status"]
             
-            # Update job info
-            job_info["status"] = status_result["status"]
             job_info["last_checked"] = asyncio.get_event_loop().time()
             
-            # If completed or failed, add final results and optionally clean up
-            if status_result["status"] in ["completed", "failed"]:
+            # If completed, failed, or cancelled, add final results and optionally clean up
+            if status_result["status"] in ["completed", "failed", "cancelled"]:
                 job_info.update(status_result)
                 # Keep job info for a while so frontend can retrieve results
                 # Could add cleanup logic here if needed
             
             return web.json_response({
                 "job_id": job_id,
+                "system_pid": job_info.get("system_pid"),
                 "job_type": "training",
                 "started_at": job_info["started_at"],
                 "last_checked": job_info["last_checked"],
@@ -1031,6 +1179,55 @@ class LightweightServer:
             
         except Exception as e:
             logger.error(f"Error checking training status: {e}")
+            return web.json_response({"status": "error", "error": str(e)}, status=500)
+
+    async def cancel_training(self, request):
+        """Cancel a running training job"""
+        try:
+            job_id = request.match_info['job_id']
+            
+            if job_id not in self.running_jobs:
+                return web.json_response({"status": "error", "error": f"Training job {job_id} not found"}, status=404)
+            
+            job_info = self.running_jobs[job_id]
+            process = job_info["process"]
+            
+            try:
+                # Terminate the process
+                process.terminate()
+                # Give it a moment to terminate gracefully
+                import time
+                time.sleep(0.5)
+                
+                # If still running, force kill
+                if process.poll() is None:
+                    process.kill()
+                
+                # Close log file if it was opened
+                if hasattr(process, '_log_file'):
+                    try:
+                        process._log_file.close()
+                    except:
+                        pass
+                
+                # Update job status
+                job_info["status"] = "cancelled"
+                job_info["cancelled_at"] = asyncio.get_event_loop().time()
+                
+                logger.info(f"Training job {job_id} cancelled successfully")
+                
+                return web.json_response({
+                    "status": "cancelled",
+                    "job_id": job_id,
+                    "message": "Training job cancelled successfully"
+                })
+                
+            except Exception as e:
+                logger.error(f"Error cancelling training job {job_id}: {e}")
+                return web.json_response({"status": "error", "error": f"Failed to cancel job: {str(e)}"}, status=500)
+            
+        except Exception as e:
+            logger.error(f"Error in cancel_training: {e}")
             return web.json_response({"status": "error", "error": str(e)}, status=500)
 
     async def count_files_glob(self, request):
