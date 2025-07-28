@@ -159,13 +159,24 @@ class TaskManager {
         ? await this.runTraining(task)
         : await this.runInference(task);
 
-      // Update task with results
-      this.updateTask(taskId, {
-        status: TASK_STATUS.COMPLETED,
-        completed: Date.now(),
-        progress: 'Completed successfully',
-        result: result
-      });
+      // Check if task was cancelled
+      if (result && result.cancelled) {
+        // Task was cancelled, update accordingly
+        this.updateTask(taskId, {
+          status: TASK_STATUS.CANCELLED,
+          completed: Date.now(),
+          progress: 'Cancelled by user',
+          result: result
+        });
+      } else {
+        // Update task with results
+        this.updateTask(taskId, {
+          status: TASK_STATUS.COMPLETED,
+          completed: Date.now(),
+          progress: 'Completed successfully',
+          result: result
+        });
+      }
 
     } catch (error) {
       // Update task with error
@@ -286,6 +297,13 @@ class TaskManager {
             config_path: configData.config_output_path,
             total_files: config.files.length || config.file_globbing_patterns.length || (config.file_list ? 1 : 0),
             message: 'Inference completed successfully',
+            job_id: jobId
+          };
+        } else if (finalResult.status === 'cancelled') {
+          return {
+            success: false,
+            cancelled: true,
+            message: 'Inference was cancelled by user',
             job_id: jobId
           };
         } else {
@@ -470,6 +488,13 @@ class TaskManager {
             config_path: configData.config_output_path,
             classes_trained: configData.class_list.length,
             message: 'Training completed successfully',
+            job_id: jobId
+          };
+        } else if (finalResult.status === 'cancelled') {
+          return {
+            success: false,
+            cancelled: true,
+            message: 'Training was cancelled by user',
             job_id: jobId
           };
         } else {
