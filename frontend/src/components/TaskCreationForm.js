@@ -25,6 +25,7 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
   const [fileSelectionMode, setFileSelectionMode] = useState(DEFAULT_VALUES.fileSelectionMode);
   const [globPatterns, setGlobPatterns] = useState(DEFAULT_VALUES.globPatterns);
   const [fileCount, setFileCount] = useState(DEFAULT_VALUES.fileCount);
+  const [firstFile, setFirstFile] = useState('');
 
   // Available audio extensions with their descriptions
   const availableExtensions = [
@@ -69,6 +70,7 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
           file_list: ''
         }));
         setFileCount(files.length);
+        setFirstFile(files[0] || '');
       }
     } catch (error) {
       console.error('Failed to select files:', error);
@@ -153,14 +155,17 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
       const result = await response.json();
       if (result.status === 'success') {
         setFileCount(result.count);
+        setFirstFile(result.first_file || '');
       } else {
         console.error('Failed to count files:', result.error);
         setFileCount(0);
+        setFirstFile('');
       }
     } catch (error) {
       console.error('Failed to count files:', error);
       // Fallback: show estimated count message
       setFileCount('? (Server not available)');
+      setFirstFile('');
       console.log('Cannot count files - backend server not available. Files will be counted during inference.');
     }
   };
@@ -178,14 +183,17 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
       const result = await response.json();
       if (result.status === 'success') {
         setFileCount(result.count);
+        setFirstFile(result.first_file || '');
       } else {
         console.error('Failed to count files:', result.error);
         setFileCount(0);
+        setFirstFile('');
       }
     } catch (error) {
       console.error('Failed to count files:', error);
       // Fallback: show estimated count message
       setFileCount('? (Server not available)');
+      setFirstFile('');
       console.log('Cannot count files - backend server not available. Files will be counted during inference.');
     }
   };
@@ -243,6 +251,7 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
     setFileSelectionMode(DEFAULT_VALUES.fileSelectionMode);
     setGlobPatterns(DEFAULT_VALUES.globPatterns);
     setFileCount(DEFAULT_VALUES.fileCount);
+    setFirstFile('');
     setSelectedExtensions([...DEFAULT_VALUES.selectedExtensions]);
     setConfig({ ...DEFAULT_VALUES.config });
   };
@@ -343,6 +352,7 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
           // Update file count based on loaded config
           if (configData.files && configData.files.length > 0) {
             setFileCount(configData.files.length);
+            setFirstFile(configData.files[0] || '');
           } else if (configData.file_globbing_patterns && configData.file_globbing_patterns.length > 0) {
             await countFilesFromPatterns(configData.file_globbing_patterns);
           } else if (configData.file_list) {
@@ -422,6 +432,7 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
                       onClick={() => {
                         setConfig(prev => ({ ...prev, files: [] }));
                         setFileCount(0);
+                        setFirstFile('');
                       }}
                       className="button-clear"
                       title="Clear selected files"
@@ -467,6 +478,7 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
                       onClick={() => {
                         setConfig(prev => ({ ...prev, file_globbing_patterns: [] }));
                         setFileCount(0);
+                        setFirstFile('');
                       }}
                       className="button-clear"
                       title="Clear selected folder"
@@ -520,6 +532,7 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
                         setConfig(prev => ({ ...prev, file_globbing_patterns: [] }));
                         setGlobPatterns('');
                         setFileCount(0);
+                        setFirstFile('');
                       }}
                       className="button-clear"
                       title="Clear patterns and found files"
@@ -547,6 +560,7 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
                       onClick={() => {
                         setConfig(prev => ({ ...prev, file_list: '' }));
                         setFileCount(0);
+                        setFirstFile('');
                       }}
                       className="button-clear"
                       title="Clear selected file list"
@@ -572,6 +586,11 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
             {fileCount > 0 && (
               <div className="total-file-count">
                 Total files: <strong>{fileCount}</strong>
+                {firstFile && (
+                  <div style={{ marginTop: '4px', fontSize: '0.9em', color: '#666' }}>
+                    First file: {firstFile.split('/').pop()}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -624,7 +643,7 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
 
         {/* Overlap */}
         <div className="form-group">
-          <label>Overlap <HelpIcon section="inference-overlap" /></label>
+          <label>Clip Overlap (sec) <HelpIcon section="inference-overlap" /></label>
           <input
             type="number"
             min="0"

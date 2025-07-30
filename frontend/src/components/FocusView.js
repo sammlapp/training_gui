@@ -343,7 +343,7 @@ function FocusView({
         )}
 
         {/* Large spectrogram display */}
-      <div className="focus-spectrogram-container">
+      <div className={`focus-spectrogram-container ${settings?.focus_size ? `size-${settings.focus_size}` : 'size-medium'}`}>
         <div 
           className="focus-spectrogram"
           onClick={handleSpectrogramClick}

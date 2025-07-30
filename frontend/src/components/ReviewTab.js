@@ -22,10 +22,10 @@ function ReviewTab({ drawerOpen = false }) {
     image_width: 400,
     image_height: 200,
     focus_mode_autoplay: true,
-    focus_resize_images: true,
-    focus_image_width: 1000,
-    focus_image_height: 400,
-    keyboard_shortcuts_enabled: true
+    focus_size: 'medium',
+    keyboard_shortcuts_enabled: true,
+    manual_classes: '',
+    clip_duration: 3.0
   });
   const [availableClasses, setAvailableClasses] = useState([]);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -53,6 +53,20 @@ function ReviewTab({ drawerOpen = false }) {
 
   // HTTP-based loader (fast and reliable)
   const httpLoader = useHttpAudioLoader('http://localhost:8000');
+
+  // Helper function to get image dimensions based on focus size setting
+  const getFocusImageDimensions = (focusSize) => {
+    switch (focusSize) {
+      case 'small':
+        return { width: 600, height: 300 };
+      case 'medium':
+        return { width: 900, height: 400 };
+      case 'large':
+        return { width: 1200, height: 500 };
+      default:
+        return { width: 900, height: 400 };
+    }
+  };
 
   const handleSettingsChange = (newSettings) => {
     setSettings(newSettings);
@@ -189,11 +203,12 @@ function ReviewTab({ drawerOpen = false }) {
 
         // Override with focus mode settings if in focus mode
         if (isFocusMode) {
+          const focusDimensions = getFocusImageDimensions(settings.focus_size);
           visualizationSettings = {
             ...visualizationSettings,
-            resize_images: settings.focus_resize_images,
-            image_width: settings.focus_image_width,
-            image_height: settings.focus_image_height,
+            resize_images: true, // Always resize for focus mode
+            image_width: focusDimensions.width,
+            image_height: focusDimensions.height,
           };
         }
 
@@ -299,31 +314,8 @@ function ReviewTab({ drawerOpen = false }) {
       if ((event.ctrlKey || event.metaKey) && event.key === 's') {
         event.preventDefault();
         if (annotationData.length > 0) {
-          // Inline save logic to avoid dependency issues
-          try {
-            if (currentSavePath && window.electronAPI?.writeFile) {
-              const csvContent = exportToCSV();
-              await window.electronAPI.writeFile(currentSavePath, csvContent);
-              setHasUnsavedChanges(false);
-              console.log('Saved to:', currentSavePath);
-            } else {
-              // Trigger Save As dialog
-              const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-              const defaultName = `annotations_${timestamp}.csv`;
-              if (window.electronAPI?.saveFile) {
-                const filePath = await window.electronAPI.saveFile(defaultName);
-                if (filePath) {
-                  const csvContent = exportToCSV();
-                  await window.electronAPI.writeFile(filePath, csvContent);
-                  setCurrentSavePath(filePath);
-                  setHasUnsavedChanges(false);
-                }
-              }
-            }
-          } catch (err) {
-            console.error('Save failed:', err);
-            setError('Save failed: ' + err.message);
-          }
+          // Use the updated handleSave function to avoid race conditions
+          handleSave();
         }
       }
     };
@@ -427,11 +419,45 @@ function ReviewTab({ drawerOpen = false }) {
         processId
       );
 
+      console.log('Raw Python script result:', result);
+      
       const data = JSON.parse(result.stdout);
+      console.log('Parsed annotation data:', data);
+      
       if (data.error) {
+        console.error('Backend error:', data.error);
         setError(data.error);
       } else {
         setAnnotationData(data.clips);
+        
+        // Auto-detect review mode based on response format
+        const hasLabelsField = data.clips.length > 0 && 'labels' in data.clips[0];
+        const hasAnnotationField = data.clips.length > 0 && 'annotation' in data.clips[0];
+        
+        if (hasLabelsField && !hasAnnotationField) {
+          // Multi-class mode
+          setSettings(prev => ({ ...prev, review_mode: 'multiclass' }));
+        } else if (hasAnnotationField && !hasLabelsField) {
+          // Binary mode
+          setSettings(prev => ({ ...prev, review_mode: 'binary' }));
+        }
+        
+        // Update class list if classes were provided
+        if (data.classes && Array.isArray(data.classes) && data.classes.length > 0) {
+          setSettings(prev => ({
+            ...prev,
+            manual_classes: data.classes.join('\n')
+          }));
+        }
+        
+        // Update clip duration if provided
+        if (data.duration !== null && data.duration !== undefined && !isNaN(data.duration)) {
+          setSettings(prev => ({
+            ...prev,
+            clip_duration: parseFloat(data.duration)
+          }));
+        }
+        
         extractAvailableClasses(data.clips);
         setCurrentPage(0);
         setHasUnsavedChanges(false);
@@ -440,6 +466,19 @@ function ReviewTab({ drawerOpen = false }) {
         localStorage.removeItem('review_autosave_location');
       }
     } catch (err) {
+      console.error('Failed to load annotation task:', err);
+      console.error('Error stack:', err.stack);
+      
+      // Try to write error to a log file for debugging
+      if (window.electronAPI?.writeFile) {
+        const errorLog = `Error loading annotation task at ${new Date().toISOString()}:\n${err.message}\n${err.stack}\n\n`;
+        try {
+          window.electronAPI.writeFile('/tmp/annotation_errors.log', errorLog, { flag: 'a' });
+        } catch (logErr) {
+          console.error('Could not write to error log:', logErr);
+        }
+      }
+      
       setError('Failed to load annotation task: ' + err.message);
     } finally {
       setLoading(false);
@@ -913,11 +952,12 @@ function ReviewTab({ drawerOpen = false }) {
       }
 
       // Use focus mode settings for focus mode
+      const focusDimensions = getFocusImageDimensions(settings.focus_size);
       visualizationSettings = {
         ...visualizationSettings,
-        resize_images: settings.focus_resize_images,
-        image_width: settings.focus_image_width,
-        image_height: settings.focus_image_height,
+        resize_images: true, // Always resize for focus mode
+        image_width: focusDimensions.width,
+        image_height: focusDimensions.height,
       };
 
       const loadedClip = await httpLoader.loadClipsBatch([clipToLoad], visualizationSettings);
@@ -959,29 +999,46 @@ function ReviewTab({ drawerOpen = false }) {
     if (!autoSaveEnabled || !hasUnsavedChanges) return;
 
     try {
-      let saveLocation = currentSavePath;
+      // Use functional setState to ensure we have the most current state
+      const autoSaveWithCurrentState = (currentData, currentSettings) => {
+        return new Promise(async (resolve) => {
+          try {
+            let saveLocation = currentSavePath;
 
-      // If no save path set, open save dialog
-      if (!saveLocation) {
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-        const defaultName = `annotations_${timestamp}.csv`;
+            // If no save path set, open save dialog
+            if (!saveLocation) {
+              const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+              const defaultName = `annotations_${timestamp}.csv`;
 
-        if (window.electronAPI?.saveFile) {
-          saveLocation = await window.electronAPI.saveFile(defaultName);
-          if (saveLocation) {
-            setCurrentSavePath(saveLocation);
-          } else {
-            return; // User cancelled save dialog
+              if (window.electronAPI?.saveFile) {
+                saveLocation = await window.electronAPI.saveFile(defaultName);
+                if (saveLocation) {
+                  setCurrentSavePath(saveLocation);
+                } else {
+                  resolve(); // User cancelled save dialog
+                  return;
+                }
+              }
+            }
+
+            if (saveLocation && window.electronAPI?.writeFile) {
+              const csvContent = exportToCSV(currentData, currentSettings);
+              await window.electronAPI.writeFile(saveLocation, csvContent);
+              setHasUnsavedChanges(false);
+              console.log('Auto-saved to:', saveLocation);
+            }
+          } catch (err) {
+            console.error('Auto-save failed:', err);
           }
-        }
-      }
+          resolve();
+        });
+      };
 
-      if (saveLocation && window.electronAPI?.writeFile) {
-        const csvContent = exportToCSV();
-        await window.electronAPI.writeFile(saveLocation, csvContent);
-        setHasUnsavedChanges(false);
-        console.log('Auto-saved to:', saveLocation);
-      }
+      // Access current state using functional setState pattern
+      setAnnotationData(currentData => {
+        autoSaveWithCurrentState(currentData, settings);
+        return currentData; // Don't modify the state
+      });
     } catch (err) {
       console.error('Auto-save failed:', err);
     }
@@ -989,92 +1046,152 @@ function ReviewTab({ drawerOpen = false }) {
 
   const handleSave = async () => {
     try {
-      // If we have a save path, use it directly
-      if (currentSavePath && window.electronAPI?.writeFile) {
-        const csvContent = exportToCSV();
-        await window.electronAPI.writeFile(currentSavePath, csvContent);
-        setHasUnsavedChanges(false);
-        console.log('Saved to:', currentSavePath);
-        return;
-      }
+      // Use functional setState to ensure we have the most current state
+      const saveWithCurrentState = (currentData, currentSettings) => {
+        return new Promise(async (resolve, reject) => {
+          try {
+            // If we have a save path, use it directly
+            if (currentSavePath && window.electronAPI?.writeFile) {
+              const csvContent = exportToCSV(currentData, currentSettings);
+              await window.electronAPI.writeFile(currentSavePath, csvContent);
+              setHasUnsavedChanges(false);
+              console.log('Saved to:', currentSavePath);
+              resolve();
+              return;
+            }
 
-      // No save path set, fall back to Save As behavior
-      await handleSaveAs();
+            // No save path set, fall back to Save As behavior
+            await handleSaveAsWithData(currentData, currentSettings);
+            resolve();
+          } catch (err) {
+            reject(err);
+          }
+        });
+      };
+
+      // Access current state using functional setState pattern
+      setAnnotationData(currentData => {
+        saveWithCurrentState(currentData, settings).catch(err => {
+          console.error('Save failed:', err);
+          setError('Save failed: ' + err.message);
+        });
+        return currentData; // Don't modify the state
+      });
     } catch (err) {
       console.error('Save failed:', err);
       setError('Save failed: ' + err.message);
     }
   };
 
+  const handleSaveAsWithData = async (currentData, currentSettings) => {
+    if (!window.electronAPI) {
+      // Browser fallback - create downloadable file
+      const csvContent = exportToCSV(currentData, currentSettings);
+      const blob = new Blob([csvContent], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `annotations_${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setHasUnsavedChanges(false);
+      return;
+    }
+
+    const csvContent = exportToCSV(currentData, currentSettings);
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const defaultName = `annotations_${timestamp}.csv`;
+
+    // Check if writeFile is available for proper Electron file saving
+    if (window.electronAPI.writeFile) {
+      const filePath = await window.electronAPI.saveFile(defaultName);
+      if (filePath) {
+        await window.electronAPI.writeFile(filePath, csvContent);
+        setCurrentSavePath(filePath); // Set the save path for future auto-saves
+        setHasUnsavedChanges(false);
+      }
+    } else {
+      // Fallback: just trigger download without file dialog
+      const blob = new Blob([csvContent], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = defaultName;
+      a.click();
+      URL.revokeObjectURL(url);
+      setHasUnsavedChanges(false);
+    }
+  };
+
   const handleSaveAs = async () => {
     try {
-      if (!window.electronAPI) {
-        // Browser fallback - create downloadable file
-        const csvContent = exportToCSV();
-        const blob = new Blob([csvContent], { type: 'text/csv' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `annotations_${new Date().toISOString().slice(0, 10)}.csv`;
-        a.click();
-        URL.revokeObjectURL(url);
-        setHasUnsavedChanges(false);
-        return;
-      }
+      // Use functional setState to ensure we have the most current state
+      const saveAsWithCurrentState = (currentData, currentSettings) => {
+        return new Promise(async (resolve, reject) => {
+          try {
+            await handleSaveAsWithData(currentData, currentSettings);
+            resolve();
+          } catch (err) {
+            reject(err);
+          }
+        });
+      };
 
-      const csvContent = exportToCSV();
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-      const defaultName = `annotations_${timestamp}.csv`;
-
-      // Check if writeFile is available for proper Electron file saving
-      if (window.electronAPI.writeFile) {
-        const filePath = await window.electronAPI.saveFile(defaultName);
-        if (filePath) {
-          await window.electronAPI.writeFile(filePath, csvContent);
-          setCurrentSavePath(filePath); // Set the save path for future auto-saves
-          setHasUnsavedChanges(false);
-        }
-      } else {
-        // Fallback: just trigger download without file dialog
-        const blob = new Blob([csvContent], { type: 'text/csv' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = defaultName;
-        a.click();
-        URL.revokeObjectURL(url);
-        setHasUnsavedChanges(false);
-      }
+      // Access current state using functional setState pattern
+      setAnnotationData(currentData => {
+        saveAsWithCurrentState(currentData, settings).catch(err => {
+          console.error('Save As failed:', err);
+          setError('Failed to export annotations: ' + err.message);
+        });
+        return currentData; // Don't modify the state
+      });
     } catch (err) {
       setError('Failed to export annotations: ' + err.message);
     }
   };
 
-  const exportToCSV = () => {
+  const exportToCSV = (dataToExport = null, currentSettings = null) => {
+    // Use provided data or current state (ensures we always have the latest data)
+    const dataToUse = dataToExport || annotationData;
+    const settingsToUse = currentSettings || settings;
+    
     // Dynamic headers based on review mode
     const baseHeaders = ['file', 'start_time', 'end_time'];
-    const annotationHeaders = settings.review_mode === 'multiclass'
+    const annotationHeaders = settingsToUse.review_mode === 'multiclass'
       ? ['labels', 'annotation_status']
       : ['annotation'];
     const headers = [...baseHeaders, ...annotationHeaders, 'comments'];
 
-    const rows = annotationData.map(clip => {
+    const rows = dataToUse.map(clip => {
       const baseRow = [
         clip.file,
         clip.start_time,
         clip.end_time
       ];
 
-      const annotationRow = settings.review_mode === 'multiclass'
-        ? [clip.labels || '', clip.annotation_status || 'unreviewed']
-        : [clip.annotation || ''];
+      const annotationRow = settingsToUse.review_mode === 'multiclass'
+        ? [
+            clip.labels != null ? clip.labels : '',
+            clip.annotation_status != null ? clip.annotation_status : 'unreviewed'
+          ]
+        : [
+            // For binary mode, treat empty string as truly empty (no annotation)
+            clip.annotation != null && clip.annotation !== '' ? clip.annotation : null
+          ];
 
-      return [...baseRow, ...annotationRow, clip.comments || ''];
+      return [...baseRow, ...annotationRow, clip.comments != null ? clip.comments : ''];
     });
 
     const csvContent = [
       headers.join(','),
-      ...rows.map(row => row.map(field => `"${field}"`).join(','))
+      ...rows.map(row => row.map(field => {
+        // Properly handle field content for CSV
+        // Use != null to check for null/undefined while preserving 0, false, ""
+        const fieldStr = field != null ? String(field) : '';
+        // Escape any quotes in the field by doubling them
+        const escapedField = fieldStr.replace(/"/g, '""');
+        return `"${escapedField}"`;
+      }).join(','))
     ].join('\n');
 
     return csvContent;

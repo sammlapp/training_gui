@@ -1266,12 +1266,19 @@ class LightweightServer:
                     logger.warning(f"Error processing pattern '{pattern}': {e}")
                     continue
             
-            total_count = len(all_files)
+            # Convert to sorted list to get consistent first file
+            all_files_list = sorted(list(all_files))
+            total_count = len(all_files_list)
+            first_file = all_files_list[0] if all_files_list else None
+            
             logger.info(f"Total unique audio files found: {total_count}")
+            if first_file:
+                logger.info(f"First file: {first_file}")
             
             return web.json_response({
                 "status": "success",
                 "count": total_count,
+                "first_file": first_file,
                 "patterns_processed": len(patterns),
                 "extensions_used": extensions
             })
@@ -1316,11 +1323,16 @@ class LightweightServer:
                             invalid_files.append(f"Line {line_num}: {file_path_line}")
                             logger.warning(f"Invalid or missing file at line {line_num}: {file_path_line}")
                 
+                first_file = valid_files[0] if valid_files else None
+                
                 logger.info(f"File list processed: {len(valid_files)} valid, {len(invalid_files)} invalid")
+                if first_file:
+                    logger.info(f"First file: {first_file}")
                 
                 return web.json_response({
                     "status": "success",
                     "count": len(valid_files),
+                    "first_file": first_file,
                     "valid_files": len(valid_files),
                     "invalid_files": len(invalid_files)
                 })

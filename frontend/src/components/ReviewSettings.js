@@ -26,9 +26,7 @@ function ReviewSettings({ onSettingsChange, onReRenderSpectrograms, onClearCache
     
     // Focus mode settings
     focus_mode_autoplay: true,
-    focus_resize_images: true,
-    focus_image_width: 1000,
-    focus_image_height: 400,
+    focus_size: 'medium', // 'small', 'medium', 'large'
     
     // Keyboard shortcuts
     keyboard_shortcuts_enabled: true,
@@ -37,7 +35,10 @@ function ReviewSettings({ onSettingsChange, onReRenderSpectrograms, onClearCache
     review_mode: 'binary', // 'binary' or 'multiclass'
     
     // Multi-class settings
-    manual_classes: ''
+    manual_classes: '',
+    
+    // Clip duration setting
+    clip_duration: 3.0
   });
   
   // Local state for text inputs to allow editing
@@ -46,8 +47,6 @@ function ReviewSettings({ onSettingsChange, onReRenderSpectrograms, onClearCache
   const [localReferenceFreq, setLocalReferenceFreq] = useState(settings.reference_frequency);
   const [localImageWidth, setLocalImageWidth] = useState(settings.image_width);
   const [localImageHeight, setLocalImageHeight] = useState(settings.image_height);
-  const [localFocusImageWidth, setLocalFocusImageWidth] = useState(settings.focus_image_width);
-  const [localFocusImageHeight, setLocalFocusImageHeight] = useState(settings.focus_image_height);
 
   const colormapOptions = [
     { value: 'greys_r', label: 'Inverse Grayscale (Default)' },
@@ -82,9 +81,7 @@ function ReviewSettings({ onSettingsChange, onReRenderSpectrograms, onClearCache
     setLocalReferenceFreq(settings.reference_frequency);
     setLocalImageWidth(settings.image_width);
     setLocalImageHeight(settings.image_height);
-    setLocalFocusImageWidth(settings.focus_image_width);
-    setLocalFocusImageHeight(settings.focus_image_height);
-  }, [settings.bandpass_range, settings.reference_frequency, settings.image_width, settings.image_height, settings.focus_image_width, settings.focus_image_height]);
+  }, [settings.bandpass_range, settings.reference_frequency, settings.image_width, settings.image_height]);
 
   // Handle immediate setting changes (for dropdowns, checkboxes, sliders)
   const handleSettingChange = (key, value) => {
@@ -145,9 +142,7 @@ function ReviewSettings({ onSettingsChange, onReRenderSpectrograms, onClearCache
       key === 'resize_images' ||
       key === 'image_width' ||
       key === 'image_height' ||
-      key === 'focus_resize_images' ||
-      key === 'focus_image_width' ||
-      key === 'focus_image_height';
+      key === 'focus_size';
     
     if (visualizationSettingsChanged) {
       // Clear cache to ensure fresh spectrograms
@@ -185,12 +180,11 @@ function ReviewSettings({ onSettingsChange, onReRenderSpectrograms, onClearCache
       image_width: 400,
       image_height: 200,
       focus_mode_autoplay: true,
-      focus_resize_images: true,
-      focus_image_width: 1000,
-      focus_image_height: 400,
+      focus_size: 'medium',
       keyboard_shortcuts_enabled: true,
       review_mode: 'binary',
-      manual_classes: ''
+      manual_classes: '',
+      clip_duration: 3.0
     };
     
     // Clear potentially corrupted visualization settings first
@@ -282,6 +276,27 @@ function ReviewSettings({ onSettingsChange, onReRenderSpectrograms, onClearCache
               </div>
             )}
 
+            {/* Clip Duration Setting */}
+            <div className="settings-section">
+              <h4>Clip Duration</h4>
+              <div className="input-group">
+                <label htmlFor="clip_duration">Default Clip Duration (seconds):</label>
+                <input
+                  id="clip_duration"
+                  type="number"
+                  value={settings.clip_duration}
+                  onChange={(e) => handleSettingChange('clip_duration', parseFloat(e.target.value) || 3.0)}
+                  min="0.1"
+                  max="30.0"
+                  step="0.1"
+                  className="duration-input"
+                />
+                <small className="help-text">
+                  Duration used for clips when end_time is not specified in the CSV file. Can be overridden when loading annotation files.
+                </small>
+              </div>
+            </div>
+
             {/* Grid Layout */}
             <div className="settings-section">
               <h4>Grid Layout</h4>
@@ -360,55 +375,18 @@ function ReviewSettings({ onSettingsChange, onReRenderSpectrograms, onClearCache
                 </label>
               </div>
               
-              <div className="focus-resize-settings">
-                <label className="toggle-label">
-                  <input
-                    type="checkbox"
-                    checked={settings.focus_resize_images}
-                    onChange={(e) => handleSettingChange('focus_resize_images', e.target.checked)}
-                  />
-                  <span>Resize images in focus mode</span>
+              <div className="focus-size-settings">
+                <label>
+                  Focus View Size:
+                  <select
+                    value={settings.focus_size}
+                    onChange={(e) => handleSettingChange('focus_size', e.target.value)}
+                  >
+                    <option value="small">Small (600px wide)</option>
+                    <option value="medium">Medium (900px wide)</option>
+                    <option value="large">Large (full width)</option>
+                  </select>
                 </label>
-                
-                {settings.focus_resize_images && (
-                  <div className="spectrogram-settings">
-                    <label>
-                      Focus Width (px):
-                      <input
-                        type="number"
-                        value={localFocusImageWidth}
-                        onChange={(e) => setLocalFocusImageWidth(parseInt(e.target.value) || 0)}
-                        onBlur={(e) => handleTextFieldChange('focus_image_width', parseInt(e.target.value) || 0)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            handleTextFieldChange('focus_image_width', parseInt(e.target.value) || 0);
-                          }
-                        }}
-                        min="200"
-                        max="2000"
-                        step="50"
-                      />
-                    </label>
-                    
-                    <label>
-                      Focus Height (px):
-                      <input
-                        type="number"
-                        value={localFocusImageHeight}
-                        onChange={(e) => setLocalFocusImageHeight(parseInt(e.target.value) || 0)}
-                        onBlur={(e) => handleTextFieldChange('focus_image_height', parseInt(e.target.value) || 0)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            handleTextFieldChange('focus_image_height', parseInt(e.target.value) || 0);
-                          }
-                        }}
-                        min="100"
-                        max="1000"
-                        step="25"
-                      />
-                    </label>
-                  </div>
-                )}
               </div>
             </div>
 

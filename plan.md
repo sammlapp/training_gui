@@ -111,10 +111,6 @@ User will select an annotation task. The interface will be very similar to that 
 - in multi-class review mode, provides two filter multi-selects: filter by label with enable/disable, and filter by annotation status with enable/disable
 
 
-## Review tab Focus view refinements
-- compact the controls: file name, annotation buttons, audio playback, comments, and forward/backward should all be smaller and be located neatly beneath the spectrogram view 
-
-
 ## Focus mode for review tab
 - provide a toggle at the top of the review page to switch between viewing lots of clips on a page (current setup) and viewing a single, large spectrogram (click to play) in 'focus' mode.
 - in focus mode, offer these shortcuts for binary classification mode: "a" = yes, "s" = no, "d" = uncertain, "f" = unlabeled. "j" view previous, "k" view next clip. spacebar to play/pause audio. 
@@ -130,15 +126,27 @@ User will select an annotation task. The interface will be very similar to that 
 - if save location has not been set, opens a File Save As dialogue to select the file
 
 # Incomplete items:
+improve paging display for review tab: should show previous specs then replace with new ones, rather than briefly showing the 'loading spectrograms' on a white page.
+
+## Review tab Focus view refinements
+- the spectrogram should be resized to fit focus-spectrogram-container
+- default size should be the size that focus-spectrogram-container currently defaults to (most of page width)
+- instead of specifying size in pixels for focus view settings, user can select 'large' 'medium' or 'small', and the focus-spectrogram-container is sized according to the page (large: takes up the whole available width)
+
+## Review tab grid view updates:
+- resizing is not working properly, because the spectrogram is sometimes not fully displayed in the panel. The spectrogram should always fit within the displayed panel. 
 
 ## app-wide updates
-We need to implement a thorough "help" functionality:
-- help page implemented as a separate tab has detailed descriptions of how to use each page and the settings within. Organized by tab name (top-level header), then by major functionalities, then by specific settings. Under the top-level header describe the general purpose and how to use the page, eg for Inference tab describe that the tools are used to run existing machine learning models on audio data to detect classes of interest; that user will select audio files and parameters; that outputs are saved to files and can be loaded in the review tab to inspect results. 
-- small question-mark icon next to buttons, form fields, settings fields across the app: hover text is "get help", and clicking the icontakes you to the relevant section of the help page
-
 - the multi-selects for filtering should use the same type of selector as the annotation panels, react-select
 
+review tab "undo" functionality? I think this would require tracking the full-page or single-clip annotations in a history so that we can sequentially undo and redo changes witch ctrl/cmd+z and ctrl/cmd+y
+
+toolbar in review tab: if too wide for current window, should float the tools onto another line like line-wrapping in a textbox. 
+
 # feature requests and TODO
+
+Inference and training tabs: at the end of the form, add a checkbox to run a small test job on a subset of clips/files. 
+
 # HAWKEARS Low band is BROKEN with dimension mismatch error
 add 'test on sample' button for inference and training
 system notifications for task completion/failure
