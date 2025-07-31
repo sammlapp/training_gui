@@ -12,7 +12,7 @@ const DEFAULT_VALUES = {
     files: [],
     file_globbing_patterns: [],
     file_list: '',
-    model: 'BirdNET',
+    model: 'BirdSetEfficientNetB1',
     overlap: 0.0,
     batch_size: 1,
     worker_count: 1,
