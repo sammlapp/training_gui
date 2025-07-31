@@ -147,16 +147,14 @@ toolbar in review tab: if too wide for current window, should float the tools on
 
 Inference and training tabs: at the end of the form, add a checkbox to run a small test job on a subset of clips/files. 
 
-# HAWKEARS Low band is BROKEN with dimension mismatch error
-add 'test on sample' button for inference and training
-system notifications for task completion/failure
-find inference or training process/PID to monitor i
-see logs of training runs (forward output of python script to a log file in output dir)
-add etas and progress for inference and training
-report metrics during training, simple loss and AUROC curve vs step
-implement embedding to hoplite db
-implement training on embeddings from hoplite db (does hoplite work on windows?)
-persistent content in each tab after navigating to other tabs
+potentially allow parallel as well as sequential tasks
+
+denoising and/or bandpassing for audio playback / review
+
+wandb integration with training & inference for logging progress and model evaluation: login on global settings page, specify user/project/run name/notes in configuration panel; if used, provide link to wandb page in task panels
+
+# HAWKEARS Low band is broken in v0.12.0: 
+need to update BMZ version then update dependency
 
 ## rewind
 - throughout the application, when providing click-to-play spectrograms, make it so that clicking on the left 20% of the spectrogram rewinds the clip to the beginning instead of performing the play/pause action. Show a rewind icon when hovering over the left 20% of the spectrogram. 
@@ -184,17 +182,18 @@ within stratification bins, selection based on score:
 - install on a remote machine accessed via SSH
 - replace native filesystem / other native system interactions with text fields or other working alternatives
 - avoid system alerts/dialogues, which won't work
-
+- add Global Settings page with option to switch between remote and desktop versions
 - make sure none of the other features depend on electron
 - provide instructions for port forwarding to access the gui on a web browser
-
+- launch from CLI with argument for HTTP forwarding port
+- will need to refactor the backend: in desktop mode, use electronAPI, in remote server mode, use aiohttp or something for the API calls; extract shared functionality between the two modes to separate functions to avoid redundancy
+- Streamlit has some nice backend support for multiple users using the same hosted app, but ours will not. Think carefully about what would happen if multiple users used the app. This gets quite a bit more complicated
 - would be huge if task management can be integrated across users; eg what if two people run the app on the same server, should have a central task management system and run jobs sequentially
 
 alternatively, could run backend on remote, run frontend locally, connect to backend via GUI on frontend. This seems more complicated overall because it requires more custom IPC.
 
 ## Training
-need logging: perhaps training run logs to a log file in the output dir, and main backend process checks this log for progress updates such as "loading training data", "initializing model", "running training"
-
+Logging: now the output of train_model.py and inference.py are logged to a file in the output directory specified in the config file. We should be able to read this output log using the main backend process / task management system, to check on the status of the running job. Or in train_model.py we can write the status to a separate "status.txt" file in the output directory, or there could be another solution for task monitoring of training/inference tasks running int he background. checks this log for progress updates such as "downloading and initializing model", "loading training data", "running training"
 
 Implement a Training tab with a Configure Training Run panel and task monitoring of training runs, similar to the Inference tab and Inference task tracking system. 
 
@@ -230,19 +229,12 @@ add toggle in inference script to embed instead or in addition to classification
 
 
 # TODO fixes and tweaks
+buggy behavior of calculating species detection rates in Explore tab: the displayed contents are "1 step behind": when changing the value on the slider with click and drag, the calculated rates are actually for the previous threshold instead of the new threshold; the displayed threshold is correct rather than lagging behind. 
 
+For this score slider and for the 
 
 # updates for review tab
 - shortcuts help: add a button in the top bar with keyboard icon, when clicked displays a pop-up panel listing all keyboard shortcuts
-
-
-- grid mode resizing is not working properly: maybe remove image resizing options? 
-
-
-- Focus mode: spectrograms are sometimes loaded as small sizes rather than as the size specified in the focus mode spectrogram size settings
-- Focus mode: move comments field to sit on the right side of the controls, rather than below the other controls. Use the full width for the controls + comment field. Make all of the controls and buttons fit into a compact area
-
-- review-content focus-mode and review-content grid-mode divs are taking up space even when they are empty. This causes the "ready for annotation review" text to display far down the page under the empty but large grid-mode div. It might also be the reason that there is always a scroll bar even when the page is not full
 
 - reference frequency line not showing. To create the reference frequency line, should make the pixels maximal value at the relevant row of the spectrogram. 
 

@@ -83,7 +83,10 @@ def load_annotation_csv(csv_path, threshold=0):
 
         # fill missing values
         df["id"] = list(range(len(df)))
-        df["comments"].fillna("", inplace=True)
+        if "comments" in df.columns:
+            df["comments"].fillna("", inplace=True)
+        else:
+            df["comments"] = ""
 
         if "annotation" in df.columns and "labels" in df.columns:
             raise ValueError(
@@ -161,34 +164,19 @@ def load_annotation_csv(csv_path, threshold=0):
                 raise ValueError(
                     f"annotation_status column contained invalid values: {invalid_statuses.unique()}. Valid values are: {valid_statuses}"
                 )
-            # Only include end_time if it was provided in the CSV
-            if "end_time" in df.columns:
-                df = df[
-                    [
-                        "file",
-                        "start_time",
-                        "end_time",
-                        "labels",
-                        "annotation_status",
-                        "comments",
-                    ]
-                ]
-            else:
-                df = df[
-                    [
-                        "file",
-                        "start_time",
-                        "labels",
-                        "annotation_status",
-                        "comments",
-                    ]
-                ]
+            # Subset columns; Only include end_time if it was provided in the CSV
+            columns = (
+                ["file", "start_time"]
+                + (["end_time"] if "end_time" in df.columns else [])
+                + ["labels", "annotation_status", "comments"]
+            )
+            df = df[columns]
             # serialize annotations to json if they are lists
             df["labels"] = df["labels"].apply(
                 lambda x: json.dumps(x) if isinstance(x, list) else "[]"
             )
 
-        if "labels" not in df.columns and "annotation" not in df.columns:
+        else:  # no 'labels' or 'annotation' columns: we expect a one-hot df with column per class
             # Handle multi-hot formatted labels (one class per column)
             # by converting to annotations and also forwarding the list of classes
             # assume this dataframe has a column per class and 0/1/nan or continuous score values
@@ -208,28 +196,13 @@ def load_annotation_csv(csv_path, threshold=0):
             # Add annotation_status for multi-class
             df["annotation_status"] = "unreviewed"
 
-            # Only include end_time if it was provided in the CSV
-            if "end_time" in df.columns:
-                df = df[
-                    [
-                        "file",
-                        "start_time",
-                        "end_time",
-                        "labels",
-                        "annotation_status",
-                        "comments",
-                    ]
-                ]
-            else:
-                df = df[
-                    [
-                        "file",
-                        "start_time",
-                        "labels",
-                        "annotation_status",
-                        "comments",
-                    ]
-                ]
+            # Subset columns; Only include end_time if it was provided in the CSV
+            columns = (
+                ["file", "start_time"]
+                + (["end_time"] if "end_time" in df.columns else [])
+                + ["labels", "annotation_status", "comments"]
+            )
+            df = df[columns]
 
         # Convert to appropriate json format and send
         clips = df.to_dict(orient="records")

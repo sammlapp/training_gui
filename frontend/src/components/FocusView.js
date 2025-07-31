@@ -245,9 +245,10 @@ function FocusView({
     if (onAnnotationChange) {
       // Convert to string format for storage
       const annotationString = classes.length > 0 ? JSON.stringify(classes) : '[]';
-      onAnnotationChange(annotationString);
+      // Pass both the new labels and preserve the current annotation status
+      onAnnotationChange(annotationString, annotation_status || 'unreviewed');
     }
-  }, [onAnnotationChange]);
+  }, [onAnnotationChange, annotation_status]);
 
   // Annotation status change handler
   const handleAnnotationStatusChange = useCallback((value) => {

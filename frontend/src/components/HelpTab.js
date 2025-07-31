@@ -67,7 +67,7 @@ function HelpTab() {
           </ul>
           
           <p><strong>File List:</strong> Provide a text file with one audio file path per line. Useful when you have a pre-defined list of files to process.</p>
-          <div style="background: #f5f5f5; padding: 10px; margin: 10px 0; border-radius: 4px;">
+          <div className="help-code-block">
             <strong>Example file list (filelist.txt):</strong><br/>
             <code>/Users/name/audio/recording1.wav<br/>
             /Users/name/audio/recording2.wav<br/>
@@ -145,7 +145,7 @@ function HelpTab() {
           <p><strong>Fully Annotated Files:</strong> CSV files where every audio clip has been completely labeled for all target classes. These provide the highest quality training data.</p>
           
           <p><strong>Format 1 - One-hot encoding (recommended):</strong></p>
-          <div style="background: #f5f5f5; padding: 10px; margin: 10px 0; border-radius: 4px; font-family: monospace;">
+          <div className="help-code-block">
             file,start_time,end_time,robin,cardinal,blue_jay<br/>
             recording1.wav,0.0,3.0,1,0,0<br/>
             recording1.wav,3.0,6.0,0,1,1<br/>
@@ -153,7 +153,7 @@ function HelpTab() {
           </div>
           
           <p><strong>Format 2 - List format:</strong></p>
-          <div style="background: #f5f5f5; padding: 10px; margin: 10px 0; border-radius: 4px; font-family: monospace;">
+          <div className="help-code-block">
             file,start_time,end_time,labels,complete<br/>
             recording1.wav,0.0,3.0,"['robin']",complete<br/>
             recording1.wav,3.0,6.0,"['cardinal','blue_jay']",complete<br/>
@@ -165,7 +165,7 @@ function HelpTab() {
           <h4 id="training-single-class">Single Class Annotations</h4>
           <p><strong>Single Class Annotations:</strong> CSV files from binary review sessions where you've labeled clips for presence/absence of a single species. These are combined to create multi-class training data.</p>
           
-          <div style="background: #f5f5f5; padding: 10px; margin: 10px 0; border-radius: 4px; font-family: monospace;">
+          <div className="help-code-block">
             <strong>Example robin_annotations.csv:</strong><br/>
             file,start_time,end_time,annotation<br/>
             recording1.wav,0.0,3.0,yes<br/>
@@ -186,7 +186,7 @@ function HelpTab() {
           <h4 id="training-background">Background Samples</h4>
           <p><strong>Background Samples:</strong> Optional CSV file containing environmental noise or audio segments without any target species. These improve model discrimination by providing explicit negative examples.</p>
           
-          <div style="background: #f5f5f5; padding: 10px; margin: 10px 0; border-radius: 4px; font-family: monospace;">
+          <div className="help-code-block">
             <strong>Example background_samples.csv:</strong><br/>
             file,start_time,end_time<br/>
             wind_noise.wav,0.0,3.0<br/>
@@ -202,7 +202,7 @@ function HelpTab() {
           <h4 id="training-class-list">Class Configuration</h4>
           <p><strong>Class List:</strong> Defines the target species or sound classes for your model. This determines the model's output structure.</p>
           
-          <div style="background: #f5f5f5; padding: 10px; margin: 10px 0; border-radius: 4px;">
+          <div className="help-info-box">
             <strong>Example formats:</strong><br/>
             <strong>Comma-separated:</strong> robin, cardinal, blue_jay, wood_thrush<br/>
             <strong>Line-separated:</strong><br/>
@@ -226,7 +226,7 @@ function HelpTab() {
           <p><strong>Root Audio Folder:</strong> Base directory for resolving relative file paths in your annotation CSVs. This enables portable annotation files that work across different systems.</p>
           
           <p><strong>Example usage:</strong></p>
-          <div style="background: #f5f5f5; padding: 10px; margin: 10px 0; border-radius: 4px;">
+          <div className="help-info-box">
             <strong>If your CSV contains:</strong><br/>
             <code>site1/morning.wav,0.0,3.0,1,0,0</code><br/><br/>
             <strong>And root folder is:</strong><br/>
@@ -249,7 +249,7 @@ function HelpTab() {
           
           <p><strong>Purpose:</strong> Provides independent test set for assessing true model performance. Without this, the system uses 80/20 train/validation split from your training data.</p>
           
-          <div style="background: #f5f5f5; padding: 10px; margin: 10px 0; border-radius: 4px; font-family: monospace;">
+          <div className="help-code-block">
             <strong>Example evaluation.csv:</strong><br/>
             file,start_time,end_time,robin,cardinal,blue_jay<br/>
             test_site1.wav,0.0,3.0,1,0,0<br/>
@@ -374,7 +374,7 @@ function HelpTab() {
           <p><strong>Load Results:</strong> Import CSV files containing inference results with detection scores and metadata.</p>
           
           <p><strong>Expected CSV format from inference:</strong></p>
-          <div style="background: #f5f5f5; padding: 10px; margin: 10px 0; border-radius: 4px; font-family: monospace;">
+          <div className="help-code-block">
             file,start_time,end_time,robin,cardinal,blue_jay<br/>
             recording1.wav,0.0,3.0,0.85,0.12,0.03<br/>
             recording1.wav,3.0,6.0,0.15,0.78,0.07<br/>
@@ -407,9 +407,66 @@ function HelpTab() {
             The interface supports both binary classification (yes/no/uncertain) and multi-class annotation workflows.
           </p>
 
+          <h4 id="review-formats">Supported CSV Formats</h4>
+          <p>The Review tab supports three different CSV formats for annotation tasks. The system automatically detects the format and switches to the appropriate review mode:</p>
+
+          <h5>Format 1: Binary Review (yes/no/uncertain)</h5>
+          <p>Used for single-species detection tasks where each clip is labeled as present, absent, or uncertain.</p>
+          <div className="help-code-block">
+            <strong>Required columns:</strong><br/>
+            file,start_time,end_time,annotation,comments<br/><br/>
+            <strong>Example binary_review.csv:</strong><br/>
+            file,start_time,end_time,annotation,comments<br/>
+            recording1.wav,0.0,3.0,yes,Clear robin song<br/>
+            recording1.wav,3.0,6.0,no,Background noise only<br/>
+            recording1.wav,6.0,9.0,uncertain,Possible robin call<br/>
+            recording2.wav,0.0,3.0,,Unannotated clip
+          </div>
+          <ul>
+            <li><strong>annotation values:</strong> "yes", "no", "uncertain", or empty (unlabeled)</li>
+            <li><strong>Auto-detection:</strong> System detects this format when "annotation" column is present without "labels" column</li>
+          </ul>
+
+          <h5>Format 2: Multi-class with Labels Column</h5>
+          <p>Used for multi-species annotation where clips can contain multiple classes simultaneously.</p>
+          <div className="help-code-block">
+            <strong>Required columns:</strong><br/>
+            file,start_time,end_time,labels,annotation_status,comments<br/><br/>
+            <strong>Example multiclass_labels.csv:</strong><br/>
+            file,start_time,end_time,labels,annotation_status,comments<br/>
+            recording1.wav,0.0,3.0,"robin,cardinal",complete,Multiple species<br/>
+            recording1.wav,3.0,6.0,"[]",complete,No target species<br/>
+            recording1.wav,6.0,9.0,"blue_jay",uncertain,Possible blue jay<br/>
+            recording2.wav,0.0,3.0,"robin",unreviewed,Auto-detected
+          </div>
+          <ul>
+            <li><strong>labels format:</strong> Comma-separated strings or JSON arrays: "robin,cardinal" or ["robin","cardinal"]</li>
+            <li><strong>annotation_status values:</strong> "complete", "unreviewed", "uncertain"</li>
+            <li><strong>Auto-detection:</strong> System detects this format when "labels" column is present</li>
+          </ul>
+
+          <h5>Format 3: Multi-hot (One Column Per Class)</h5>
+          <p>Used when you have a column for each target class with 0/1 values or continuous confidence scores.</p>
+          <div className="help-code-block">
+            <strong>Dynamic columns:</strong><br/>
+            file,start_time,end_time,[class1],[class2],[class3]...,comments<br/><br/>
+            <strong>Example multihot_classes.csv:</strong><br/>
+            file,start_time,end_time,robin,cardinal,blue_jay,comments<br/>
+            recording1.wav,0.0,3.0,1,0,0,Robin detected<br/>
+            recording1.wav,3.0,6.0,1,1,0,Both robin and cardinal<br/>
+            recording1.wav,6.0,9.0,0,0,1,Blue jay only<br/>
+            recording2.wav,0.0,3.0,0,0,0,No target species
+          </div>
+          <ul>
+            <li><strong>Class values:</strong> 0 (absent), 1 (present), or continuous scores (0.0-1.0)</li>
+            <li><strong>Threshold:</strong> Values above threshold (default 0) are considered present</li>
+            <li><strong>Auto-detection:</strong> System detects this when no "annotation" or "labels" columns exist</li>
+            <li><strong>Classes extracted:</strong> All columns except file, start_time, end_time, comments become class names</li>
+          </ul>
+
           <h4>Annotation Modes</h4>
-          <p><strong>Binary Review:</strong> Annotate clips as yes/no/uncertain/unlabeled for a single species or sound type.</p>
-          <p><strong>Multi-class Review:</strong> Assign multiple class labels to each audio clip from your defined class list.</p>
+          <p><strong>Binary Review:</strong> Annotate clips as yes/no/uncertain/unlabeled for a single species or sound type (Format 1).</p>
+          <p><strong>Multi-class Review:</strong> Assign multiple class labels to each audio clip from your defined class list (Formats 2 & 3).</p>
 
           <h4>Display Options</h4>
           <p><strong>Grid Mode:</strong> View multiple spectrograms simultaneously for efficient batch annotation.</p>

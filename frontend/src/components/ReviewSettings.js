@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 
-function ReviewSettings({ onSettingsChange, onReRenderSpectrograms, onClearCache }) {
+function ReviewSettings({ onSettingsChange, onReRenderSpectrograms, onClearCache, currentSettings }) {
   const [settings, setSettings] = useState({
     // Spectrogram settings
     spec_window_size: 512,
@@ -73,6 +73,13 @@ function ReviewSettings({ onSettingsChange, onReRenderSpectrograms, onClearCache
       }
     }
   }, []);
+
+  // Sync with parent settings when they change (e.g., when review mode is auto-detected)
+  useEffect(() => {
+    if (currentSettings) {
+      setSettings(prev => ({ ...prev, ...currentSettings }));
+    }
+  }, [currentSettings]);
 
   // Sync local state when settings change
   useEffect(() => {

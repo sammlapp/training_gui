@@ -4,6 +4,7 @@ import { Close as CloseIcon } from '@mui/icons-material';
 import AnnotationCard from './AnnotationCard';
 import ReviewSettings from './ReviewSettings';
 import FocusView from './FocusView';
+import HelpIcon from './HelpIcon';
 import { useHttpAudioLoader, HttpServerStatus } from './HttpAudioLoader';
 
 function ReviewTab({ drawerOpen = false }) {
@@ -420,20 +421,20 @@ function ReviewTab({ drawerOpen = false }) {
       );
 
       console.log('Raw Python script result:', result);
-      
+
       const data = JSON.parse(result.stdout);
       console.log('Parsed annotation data:', data);
-      
+
       if (data.error) {
         console.error('Backend error:', data.error);
         setError(data.error);
       } else {
         setAnnotationData(data.clips);
-        
+
         // Auto-detect review mode based on response format
         const hasLabelsField = data.clips.length > 0 && 'labels' in data.clips[0];
         const hasAnnotationField = data.clips.length > 0 && 'annotation' in data.clips[0];
-        
+
         if (hasLabelsField && !hasAnnotationField) {
           // Multi-class mode
           setSettings(prev => ({ ...prev, review_mode: 'multiclass' }));
@@ -441,7 +442,7 @@ function ReviewTab({ drawerOpen = false }) {
           // Binary mode
           setSettings(prev => ({ ...prev, review_mode: 'binary' }));
         }
-        
+
         // Update class list if classes were provided
         if (data.classes && Array.isArray(data.classes) && data.classes.length > 0) {
           setSettings(prev => ({
@@ -449,7 +450,7 @@ function ReviewTab({ drawerOpen = false }) {
             manual_classes: data.classes.join('\n')
           }));
         }
-        
+
         // Update clip duration if provided
         if (data.duration !== null && data.duration !== undefined && !isNaN(data.duration)) {
           setSettings(prev => ({
@@ -457,7 +458,7 @@ function ReviewTab({ drawerOpen = false }) {
             clip_duration: parseFloat(data.duration)
           }));
         }
-        
+
         extractAvailableClasses(data.clips);
         setCurrentPage(0);
         setHasUnsavedChanges(false);
@@ -468,7 +469,7 @@ function ReviewTab({ drawerOpen = false }) {
     } catch (err) {
       console.error('Failed to load annotation task:', err);
       console.error('Error stack:', err.stack);
-      
+
       // Try to write error to a log file for debugging
       if (window.electronAPI?.writeFile) {
         const errorLog = `Error loading annotation task at ${new Date().toISOString()}:\n${err.message}\n${err.stack}\n\n`;
@@ -478,7 +479,7 @@ function ReviewTab({ drawerOpen = false }) {
           console.error('Could not write to error log:', logErr);
         }
       }
-      
+
       setError('Failed to load annotation task: ' + err.message);
     } finally {
       setLoading(false);
@@ -1034,10 +1035,14 @@ function ReviewTab({ drawerOpen = false }) {
         });
       };
 
-      // Access current state using functional setState pattern
+      // Access current state using functional setState pattern - get both data and settings
       setAnnotationData(currentData => {
-        autoSaveWithCurrentState(currentData, settings);
-        return currentData; // Don't modify the state
+        // Use functional setState to get current settings too
+        setSettings(currentSettings => {
+          autoSaveWithCurrentState(currentData, currentSettings);
+          return currentSettings; // Don't modify the settings
+        });
+        return currentData; // Don't modify the data
       });
     } catch (err) {
       console.error('Auto-save failed:', err);
@@ -1069,13 +1074,17 @@ function ReviewTab({ drawerOpen = false }) {
         });
       };
 
-      // Access current state using functional setState pattern
+      // Access current state using functional setState pattern - get both data and settings
       setAnnotationData(currentData => {
-        saveWithCurrentState(currentData, settings).catch(err => {
-          console.error('Save failed:', err);
-          setError('Save failed: ' + err.message);
+        // Use functional setState to get current settings too
+        setSettings(currentSettings => {
+          saveWithCurrentState(currentData, currentSettings).catch(err => {
+            console.error('Save failed:', err);
+            setError('Save failed: ' + err.message);
+          });
+          return currentSettings; // Don't modify the settings
         });
-        return currentData; // Don't modify the state
+        return currentData; // Don't modify the data
       });
     } catch (err) {
       console.error('Save failed:', err);
@@ -1137,13 +1146,17 @@ function ReviewTab({ drawerOpen = false }) {
         });
       };
 
-      // Access current state using functional setState pattern
+      // Access current state using functional setState pattern - get both data and settings
       setAnnotationData(currentData => {
-        saveAsWithCurrentState(currentData, settings).catch(err => {
-          console.error('Save As failed:', err);
-          setError('Failed to export annotations: ' + err.message);
+        // Use functional setState to get current settings too
+        setSettings(currentSettings => {
+          saveAsWithCurrentState(currentData, currentSettings).catch(err => {
+            console.error('Save As failed:', err);
+            setError('Failed to export annotations: ' + err.message);
+          });
+          return currentSettings; // Don't modify the settings
         });
-        return currentData; // Don't modify the state
+        return currentData; // Don't modify the data
       });
     } catch (err) {
       setError('Failed to export annotations: ' + err.message);
@@ -1154,7 +1167,7 @@ function ReviewTab({ drawerOpen = false }) {
     // Use provided data or current state (ensures we always have the latest data)
     const dataToUse = dataToExport || annotationData;
     const settingsToUse = currentSettings || settings;
-    
+
     // Dynamic headers based on review mode
     const baseHeaders = ['file', 'start_time', 'end_time'];
     const annotationHeaders = settingsToUse.review_mode === 'multiclass'
@@ -1171,24 +1184,30 @@ function ReviewTab({ drawerOpen = false }) {
 
       const annotationRow = settingsToUse.review_mode === 'multiclass'
         ? [
-            clip.labels != null ? clip.labels : '',
-            clip.annotation_status != null ? clip.annotation_status : 'unreviewed'
-          ]
+          clip.labels != null ? clip.labels : '',
+          clip.annotation_status != null ? clip.annotation_status : 'unreviewed'
+        ]
         : [
-            // For binary mode, treat empty string as truly empty (no annotation)
-            clip.annotation != null && clip.annotation !== '' ? clip.annotation : null
-          ];
+          // For binary mode, treat empty string as truly empty (no annotation)
+          clip.annotation != null && clip.annotation !== '' ? clip.annotation : null
+        ];
 
-      return [...baseRow, ...annotationRow, clip.comments != null ? clip.comments : ''];
+      // Handle comments: treat empty/NaN/null as truly null
+      const commentsValue = clip.comments != null && clip.comments !== '' && !Number.isNaN(clip.comments) ? clip.comments : null;
+      
+      return [...baseRow, ...annotationRow, commentsValue];
     });
 
     const csvContent = [
       headers.join(','),
       ...rows.map(row => row.map(field => {
         // Properly handle field content for CSV
-        // Use != null to check for null/undefined while preserving 0, false, ""
-        const fieldStr = field != null ? String(field) : '';
-        // Escape any quotes in the field by doubling them
+        // If field is null/undefined, output empty (no quotes)
+        if (field == null) {
+          return '';
+        }
+        // Convert to string and escape quotes
+        const fieldStr = String(field);
         const escapedField = fieldStr.replace(/"/g, '""');
         return `"${escapedField}"`;
       }).join(','))
@@ -1535,6 +1554,7 @@ function ReviewTab({ drawerOpen = false }) {
                 onSettingsChange={handleSettingsChange}
                 onReRenderSpectrograms={loadCurrentPageSpectrograms}
                 onClearCache={httpLoader.clearCache}
+                currentSettings={settings}
               />
               <HttpServerStatus
                 serverUrl="http://localhost:8000"
@@ -1700,7 +1720,7 @@ function ReviewTab({ drawerOpen = false }) {
       {/* Main Content Area - Full Window */}
       <div className="review-main-content">
         {/* Compact Top Toolbar */}
-        <div 
+        <div
           className="review-toolbar"
           style={{
             left: drawerOpen ? '240px' : 'calc(64px + 1px)',
@@ -1897,7 +1917,7 @@ function ReviewTab({ drawerOpen = false }) {
             >
               <span className="material-symbols-outlined">keyboard</span>
             </button>
-            
+
             {/* Settings Button */}
             <button
               onClick={() => setIsSettingsPanelOpen(true)}
@@ -1953,17 +1973,45 @@ function ReviewTab({ drawerOpen = false }) {
               <div className="placeholder-container">
                 <div className="placeholder-content">
                   <div className="placeholder-icon">📝</div>
-                  <h3>Ready for Annotation Review</h3>
-                  <p>Load a CSV file to begin reviewing and annotating audio clips. The CSV should contain:</p>
-                  <ul>
-                    <li><strong>file</strong>: Path to audio file</li>
-                    <li><strong>start_time</strong>: Start time in seconds</li>
-                    <li><strong>end_time</strong>: End time in seconds (optional)</li>
-                    <li>Either <strong>annotation</strong>: Binary classification label (yes/no/uncertain)</li>
-                    <li>Or <strong>labels</strong> and <strong>complete</strong>: Comma-separated labels for multi-class annotations</li>
-                    <li><strong>comments</strong>: Text comments (optional)</li>
-                  </ul>
-                  <p>Choose between binary review (yes/no/uncertain) or multi-class review modes.</p>
+                  <h3>Ready for Annotation Review <HelpIcon section="review" /></h3>
+                  <p>Load a CSV file to begin reviewing and annotating audio clips. Supported formats:</p>
+                  
+                  <div className="format-section">
+                    <h4>📋 Required Columns (all formats)</h4>
+                    <ul>
+                      <li><strong>file</strong>: Path to audio file</li>
+                      <li><strong>start_time</strong>: Start time in seconds</li>
+                      <li><strong>end_time</strong>: End time in seconds (optional)</li>
+                      <li><strong>comments</strong>: Text comments (optional)</li>
+                    </ul>
+                  </div>
+
+                  <div className="format-section">
+                    <h4>🔵 Format 1: Binary Review</h4>
+                    <ul>
+                      <li><strong>annotation</strong>: Binary labels (yes/no/uncertain/empty)</li>
+                    </ul>
+                    <p><em>Example: file,start_time,end_time,annotation,comments</em></p>
+                  </div>
+
+                  <div className="format-section">
+                    <h4>🟢 Format 2: Multi-class with Labels Column</h4>
+                    <ul>
+                      <li><strong>labels</strong>: Comma-separated or JSON list of classes</li>
+                      <li><strong>annotation_status</strong>: complete/unreviewed/uncertain</li>
+                    </ul>
+                    <p><em>Example: file,start_time,end_time,labels,annotation_status,comments</em></p>
+                  </div>
+
+                  <div className="format-section">
+                    <h4>🟡 Format 3: Multi-hot (One Column Per Class)</h4>
+                    <ul>
+                      <li><strong>[class_name]</strong>: One column per class with 0/1 values or continuous scores</li>
+                    </ul>
+                    <p><em>Example: file,start_time,end_time,robin,cardinal,blue_jay,comments</em></p>
+                  </div>
+
+                  <p><strong>The system auto-detects the format and switches to the appropriate review mode.</strong></p>
 
                   {/* Load CSV Button */}
                   <div className="placeholder-actions">
