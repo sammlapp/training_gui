@@ -6,7 +6,7 @@ const DEFAULT_VALUES = {
   taskName: '',
   singleClassAnnotations: [],
   config: {
-    model: 'BirdNET',
+    model: 'HawkEars_Embedding',
     class_list: '',
     fully_annotated_files: [],
     single_class_annotations: [],
@@ -14,7 +14,7 @@ const DEFAULT_VALUES = {
     root_audio_folder: '',
     evaluation_file: '',
     save_location: '',
-    batch_size: 32,
+    batch_size: 128,
     num_workers: 4,
     freeze_feature_extractor: true,
     use_multi_layer_classifier: false,
@@ -38,7 +38,7 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
     if (Array.isArray(config.class_list)) {
       return config.class_list.filter(cls => cls && cls.length > 0);
     }
-    
+
     // Handle string case
     if (typeof config.class_list === 'string') {
       return config.class_list
@@ -46,7 +46,7 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
         .map(cls => cls.trim())
         .filter(cls => cls.length > 0);
     }
-    
+
     // Fallback for other types
     return [];
   };
@@ -353,8 +353,8 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
             num_workers: configData.training_settings?.num_workers || 4,
             freeze_feature_extractor: configData.training_settings?.freeze_feature_extractor !== false,
             use_multi_layer_classifier: Boolean(configData.training_settings?.classifier_hidden_layer_sizes),
-            classifier_hidden_layer_sizes_input: Array.isArray(configData.training_settings?.classifier_hidden_layer_sizes) 
-              ? configData.training_settings.classifier_hidden_layer_sizes.join(', ') 
+            classifier_hidden_layer_sizes_input: Array.isArray(configData.training_settings?.classifier_hidden_layer_sizes)
+              ? configData.training_settings.classifier_hidden_layer_sizes.join(', ')
               : '100'
           }));
 
@@ -412,7 +412,7 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
                 Select Fully Annotated CSV Files
               </button>
               {config.fully_annotated_files.length > 0 && (
-                <button 
+                <button
                   onClick={() => setConfig(prev => ({ ...prev, fully_annotated_files: [] }))}
                   className="button-clear"
                   title="Clear selected files"
@@ -448,7 +448,7 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
                 Add Single Class Annotation Files
               </button>
               {singleClassAnnotations.length > 0 && (
-                <button 
+                <button
                   onClick={() => {
                     setSingleClassAnnotations([]);
                     setConfig(prev => ({ ...prev, single_class_annotations: [] }));
@@ -520,7 +520,7 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
                 Select Background Samples CSV
               </button>
               {config.background_samples_file && (
-                <button 
+                <button
                   onClick={() => setConfig(prev => ({ ...prev, background_samples_file: '' }))}
                   className="button-clear"
                   title="Clear selected background samples file"
@@ -549,7 +549,7 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
                 Select Root Audio Folder
               </button>
               {config.root_audio_folder && (
-                <button 
+                <button
                   onClick={() => setConfig(prev => ({ ...prev, root_audio_folder: '' }))}
                   className="button-clear"
                   title="Clear selected root audio folder"
@@ -578,7 +578,7 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
                 Select Evaluation CSV
               </button>
               {config.evaluation_file && (
-                <button 
+                <button
                   onClick={() => setConfig(prev => ({ ...prev, evaluation_file: '' }))}
                   className="button-clear"
                   title="Clear selected evaluation file"
@@ -607,7 +607,7 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
                 Select Save Directory
               </button>
               {config.save_location && (
-                <button 
+                <button
                   onClick={() => setConfig(prev => ({ ...prev, save_location: '' }))}
                   className="button-clear"
                   title="Clear selected save location"
