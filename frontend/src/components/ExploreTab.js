@@ -1,7 +1,56 @@
 import { useState, useRef, useMemo, useCallback, useEffect } from 'react';
+import { Slider, styled } from '@mui/material';
 import SpeciesMultiSelect from './SpeciesMultiSelect';
 import AudioClipCard from './AudioClipCard';
 import DisplaySettings from './DisplaySettings';
+
+// Styled Material UI Slider with local color scheme
+const StyledSlider = styled(Slider)({
+  color: '#4f5d75', // --dark-accent
+  height: 4,
+  '& .MuiSlider-track': {
+    border: 'none',
+    backgroundColor: '#4f5d75', // --dark-accent
+  },
+  '& .MuiSlider-rail': {
+    backgroundColor: '#d1d5db', // --border
+    opacity: 1,
+  },
+  '& .MuiSlider-thumb': {
+    height: 16,
+    width: 16,
+    backgroundColor: '#4f5d75', // --dark-accent
+    border: '2px solid currentColor',
+    '&:focus, &:hover, &.Mui-active, &.Mui-focusVisible': {
+      boxShadow: 'inherit',
+    },
+    '&:before': {
+      display: 'none',
+    },
+    '&:hover': {
+      backgroundColor: '#395756', // --dark
+    },
+  },
+  '& .MuiSlider-valueLabel': {
+    lineHeight: 1.2,
+    fontSize: 12,
+    background: 'unset',
+    padding: 0,
+    width: 32,
+    height: 32,
+    borderRadius: '50% 50% 50% 0',
+    backgroundColor: '#4f5d75', // --dark-accent
+    transformOrigin: 'bottom left',
+    transform: 'translate(50%, -100%) rotate(-45deg) scale(0)',
+    '&:before': { display: 'none' },
+    '&.MuiSlider-valueLabelOpen': {
+      transform: 'translate(50%, -100%) rotate(-45deg) scale(1)',
+    },
+    '& > *': {
+      transform: 'rotate(45deg)',
+    },
+  },
+});
 
 function ExploreTab() {
   const [scoreData, setScoreData] = useState(null);
@@ -351,11 +400,11 @@ function ExploreTab() {
   // Total pages calculation
   const totalPages = Math.ceil(filteredSpecies.length / SPECIES_PER_PAGE);
 
-  const generateDetectionSummary = (data) => {
+  const generateDetectionSummary = (data, threshold = scoreThreshold) => {
     const summary = {};
 
     Object.entries(data.scores).forEach(([species, scores]) => {
-      const detections = scores.filter(score => score >= scoreThreshold);
+      const detections = scores.filter(score => score >= threshold);
       const maxScore = Math.max(...scores);
       const avgScore = scores.reduce((a, b) => a + b, 0) / scores.length;
 
@@ -673,44 +722,46 @@ function ExploreTab() {
             <h3>Detection Threshold</h3>
             <div className="threshold-controls">
               <label>
-                Score Threshold: {isThresholdDragging ? tempThreshold : scoreThreshold}
-                <input
-                  type="range"
-                  min={scoreData.min_score}
-                  max={scoreData.max_score}
-                  step="0.01"
-                  value={isThresholdDragging ? tempThreshold : scoreThreshold}
-                  onMouseDown={() => setIsThresholdDragging(true)}
-                  onMouseUp={() => {
-                    setIsThresholdDragging(false);
-                    setScoreThreshold(tempThreshold);
-                    // Clear any pending timeout
+                Score Threshold: {(isThresholdDragging ? tempThreshold : scoreThreshold).toFixed(3)}
+              </label>
+              <StyledSlider
+                size="small"
+                min={scoreData.min_score}
+                max={scoreData.max_score}
+                step={0.01}
+                value={isThresholdDragging ? tempThreshold : scoreThreshold}
+                valueLabelDisplay="auto"
+                valueLabelFormat={(value) => value.toFixed(3)}
+                onMouseDown={() => setIsThresholdDragging(true)}
+                onChangeCommitted={() => {
+                  setIsThresholdDragging(false);
+                  setScoreThreshold(tempThreshold);
+                  // Clear any pending timeout
+                  if (thresholdTimeoutRef.current) {
+                    clearTimeout(thresholdTimeoutRef.current);
+                  }
+                  // Update immediately with the correct threshold value
+                  thresholdTimeoutRef.current = setTimeout(() => {
+                    generateDetectionSummary(scoreData, tempThreshold);
+                  }, 100);
+                }}
+                onChange={(e, newValue) => {
+                  const newThreshold = parseFloat(newValue);
+                  if (isThresholdDragging) {
+                    setTempThreshold(newThreshold);
+                  } else {
+                    setScoreThreshold(newThreshold);
+                    // Debounce the summary generation
                     if (thresholdTimeoutRef.current) {
                       clearTimeout(thresholdTimeoutRef.current);
                     }
-                    // Update after a short delay to allow slider to finish
                     thresholdTimeoutRef.current = setTimeout(() => {
-                      generateDetectionSummary(scoreData);
-                    }, 100);
-                  }}
-                  onChange={(e) => {
-                    const newThreshold = parseFloat(e.target.value);
-                    if (isThresholdDragging) {
-                      setTempThreshold(newThreshold);
-                    } else {
-                      setScoreThreshold(newThreshold);
-                      // Debounce the summary generation
-                      if (thresholdTimeoutRef.current) {
-                        clearTimeout(thresholdTimeoutRef.current);
-                      }
-                      thresholdTimeoutRef.current = setTimeout(() => {
-                        generateDetectionSummary(scoreData);
-                      }, 300);
-                    }
-                  }}
-                  className="threshold-slider"
-                />
-              </label>
+                      generateDetectionSummary(scoreData, newThreshold);
+                    }, 300);
+                  }
+                }}
+                className="threshold-slider"
+              />
             </div>
 
             {createBarChart()}

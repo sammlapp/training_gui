@@ -1,4 +1,53 @@
 import { useState, useEffect } from 'react';
+import { Slider, styled } from '@mui/material';
+
+// Styled Material UI Slider with local color scheme
+const StyledSlider = styled(Slider)({
+  color: '#4f5d75', // --dark-accent
+  height: 4,
+  '& .MuiSlider-track': {
+    border: 'none',
+    backgroundColor: '#4f5d75', // --dark-accent
+  },
+  '& .MuiSlider-rail': {
+    backgroundColor: '#d1d5db', // --border
+    opacity: 1,
+  },
+  '& .MuiSlider-thumb': {
+    height: 16,
+    width: 16,
+    backgroundColor: '#4f5d75', // --dark-accent
+    border: '2px solid currentColor',
+    '&:focus, &:hover, &.Mui-active, &.Mui-focusVisible': {
+      boxShadow: 'inherit',
+    },
+    '&:before': {
+      display: 'none',
+    },
+    '&:hover': {
+      backgroundColor: '#395756', // --dark
+    },
+  },
+  '& .MuiSlider-valueLabel': {
+    lineHeight: 1.2,
+    fontSize: 12,
+    background: 'unset',
+    padding: 0,
+    width: 32,
+    height: 32,
+    borderRadius: '50% 50% 50% 0',
+    backgroundColor: '#4f5d75', // --dark-accent
+    transformOrigin: 'bottom left',
+    transform: 'translate(50%, -100%) rotate(-45deg) scale(0)',
+    '&:before': { display: 'none' },
+    '&.MuiSlider-valueLabelOpen': {
+      transform: 'translate(50%, -100%) rotate(-45deg) scale(1)',
+    },
+    '& > *': {
+      transform: 'rotate(45deg)',
+    },
+  },
+});
 
 function ReviewSettings({ onSettingsChange, onReRenderSpectrograms, onClearCache, currentSettings }) {
   const [settings, setSettings] = useState({
@@ -494,34 +543,24 @@ function ReviewSettings({ onSettingsChange, onReRenderSpectrograms, onClearCache
                       Narrower range increases contrast.
                     </small>
                   </div>
-                  <div className="range-slider-container">
-                    <input
-                      type="range"
-                      min="-120"
-                      max="0"
-                      step="5"
-                      value={settings.dB_range[0]}
-                      onChange={(e) => {
-                        const newMin = parseInt(e.target.value);
-                        if (newMin < settings.dB_range[1] - 5) {
-                          handleSettingChange('dB_range', [newMin, settings.dB_range[1]]);
+                  <div className="range-slider-container" style={{ padding: '20px 10px' }}>
+                    <StyledSlider
+                      size="small"
+                      value={settings.dB_range}
+                      onChange={(e, newValue) => {
+                        // Ensure minimum gap of 5 dB
+                        const [newMin, newMax] = newValue;
+                        if (newMax - newMin >= 5) {
+                          handleSettingChange('dB_range', [newMin, newMax]);
                         }
                       }}
-                      className="range-slider range-min"
-                    />
-                    <input
-                      type="range"
-                      min="-120"
-                      max="0" 
-                      step="5"
-                      value={settings.dB_range[1]}
-                      onChange={(e) => {
-                        const newMax = parseInt(e.target.value);
-                        if (newMax > settings.dB_range[0] + 5) {
-                          handleSettingChange('dB_range', [settings.dB_range[0], newMax]);
-                        }
-                      }}
-                      className="range-slider range-max"
+                      valueLabelDisplay="auto"
+                      valueLabelFormat={(value) => `${value} dB`}
+                      min={-120}
+                      max={0}
+                      step={5}
+                      disableSwap
+                      className="db-range-slider"
                     />
                   </div>
                 </label>

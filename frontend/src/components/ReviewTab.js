@@ -1194,7 +1194,7 @@ function ReviewTab({ drawerOpen = false }) {
 
       // Handle comments: treat empty/NaN/null as truly null
       const commentsValue = clip.comments != null && clip.comments !== '' && !Number.isNaN(clip.comments) ? clip.comments : null;
-      
+
       return [...baseRow, ...annotationRow, commentsValue];
     });
 
@@ -1972,10 +1972,9 @@ function ReviewTab({ drawerOpen = false }) {
             !loading && !error && (
               <div className="placeholder-container">
                 <div className="placeholder-content">
-                  <div className="placeholder-icon">📝</div>
-                  <h3>Ready for Annotation Review <HelpIcon section="review" /></h3>
+                  <h3>Ready for Annotation Review 📝 <HelpIcon section="review" /></h3>
                   <p>Load a CSV file to begin reviewing and annotating audio clips. Supported formats:</p>
-                  
+
                   <div className="format-section">
                     <h4>📋 Required Columns (all formats)</h4>
                     <ul>
@@ -1984,27 +1983,21 @@ function ReviewTab({ drawerOpen = false }) {
                       <li><strong>end_time</strong>: End time in seconds (optional)</li>
                       <li><strong>comments</strong>: Text comments (optional)</li>
                     </ul>
-                  </div>
 
-                  <div className="format-section">
-                    <h4>🔵 Format 1: Binary Review</h4>
+                    <h4>Format 1: Binary Review</h4>
                     <ul>
                       <li><strong>annotation</strong>: Binary labels (yes/no/uncertain/empty)</li>
                     </ul>
                     <p><em>Example: file,start_time,end_time,annotation,comments</em></p>
-                  </div>
 
-                  <div className="format-section">
-                    <h4>🟢 Format 2: Multi-class with Labels Column</h4>
+                    <h4>Format 2: Multi-class with Labels Column</h4>
                     <ul>
                       <li><strong>labels</strong>: Comma-separated or JSON list of classes</li>
                       <li><strong>annotation_status</strong>: complete/unreviewed/uncertain</li>
                     </ul>
                     <p><em>Example: file,start_time,end_time,labels,annotation_status,comments</em></p>
-                  </div>
 
-                  <div className="format-section">
-                    <h4>🟡 Format 3: Multi-hot (One Column Per Class)</h4>
+                    <h4>Format 3: Multi-hot (One Column Per Class)</h4>
                     <ul>
                       <li><strong>[class_name]</strong>: One column per class with 0/1 values or continuous scores</li>
                     </ul>

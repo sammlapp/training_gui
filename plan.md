@@ -104,20 +104,6 @@ User will select an annotation task. The interface will be very similar to that 
 - ctrl/cmd+A/S/D/F: annotate all clips on page as yes/no/uncertain/unlabeled (only has an effect in binary classification model)
 - ctrl+j/k: previous/next page 
 
-
-## Filtering by annotation for review tab
-- in the left tray, add a multi-select box for filtering by annotation
-- in binary review mode, filters by `annotation`, and a checkbox to enable/disable filtering
-- in multi-class review mode, provides two filter multi-selects: filter by label with enable/disable, and filter by annotation status with enable/disable
-
-
-## Focus mode for review tab
-- provide a toggle at the top of the review page to switch between viewing lots of clips on a page (current setup) and viewing a single, large spectrogram (click to play) in 'focus' mode.
-- in focus mode, offer these shortcuts for binary classification mode: "a" = yes, "s" = no, "d" = uncertain, "f" = unlabeled. "j" view previous, "k" view next clip. spacebar to play/pause audio. 
-- in focus mode, auto-advance to next clip when user clicks or uses shortcut to provide an annotation of yes/no/unknown/unlabeled
-- in settings panel, add a check box for whether to auto-play clips when using focus mode. When checked, the audio begins as soon as the spectrogram is displayed. 
-- help me debug why spectrograms appear as white-on-black instead of in color when choosing a colormap
-
 ## auto-save for review tab
 - create a session variable for where to save annotations
 - add a toggle/button switch for auto-save on/off, default on
