@@ -267,32 +267,29 @@ The running task continues when the app quits.
 for completed tasks, add buttons to
 - open results in Explore tab
 - create annotation task (we need to implement a wizard/panel for this)
+Inference:
 - subset classes: can use text file or ebird filter
+
+Inference update:
 - optional sparse outputs: don't save scores below a floor, and save df as a sparse pickle
+I've implemented this in inference.py using config['sparse_save_threshold']. Update the frontend inference config creator to:
+- toggle on/off an option to save only values below a threshold. If off, config['sparse_save_threshold'] is none/null
+- if toggled on, user specifies the numeric threshold for the logit score beneath which scores are discarded, default value -3. config['sparse_save_threshold']
+- output_file of the config should be predictions.csv if sparse_save_threshold is None and sparse_predictions.pkl if the threshold is used
 
 
-Inference settings panel: 
-- remove "saved" and "loaded" alerts after save/load of json config. Instead just put a message in the status bar. 
+- Eventually, explore tab should support loading sparse predictions, but this will require using python backend to run `sparse_df_loaded = pd.read_pickle("sparse_df.pkl")`. the sparse values are np.nan and should always be treated as non-detections. 
 
-option to split up inference tasks into one task per subfolder
-
-
-- TODO: how to divide up inference task? by subfolders? aggregate results or keep separate?
-- TODO: better progress reporting, currently goes from 0-100 instantly
-- TODO: smart segmenting into subtasks for large prediction tasks, with intermittent saving
-
-Job management and display bugs:
-- as with training, the outputs of the inference script should be logged to a file in the job folder. This will help with debugging
-- want to be have the system process ID (rather than internal job ID) in the task pane - is this possible?
-- jobs used to show as completed once they finished, but now even when an inference job is actually finished, it shows as running indefinitely
-- "Inference running..." is shown for canceled tasks. 
-
+TODO:
+- allow setting threshold when loading an annotation task in Review mode
 
 # Explore tab updates
-- should have a little button in the panel (gold medal icon: 🥇) to return to viewing the highest-scoring clip (eg after clicking on a histogram bin)
+- should have a little button in the panel (gold medal icon: 🥇)  to the right of the title, to return to viewing the highest-scoring clip (eg after clicking on a histogram bin)
 - put the display settings in a side panel/tray, like the settings panel in the review tab. Make sure the settings are properly implemented and are not mixed up with the display settings for the review tab. 
 - images are being cut off at the bottom. Resize them to the height of the 
 
 future items:
 - use Material UI badges and small photos of the class detected for quick overview (use birdnames repo for name translation, find open-source set of images for species headshots or use the global bird svgs dataset)
 
+
+when selecting models in inference or training mode, we should be able to select a local model file instead of 

@@ -32,7 +32,7 @@ class TaskManager {
   createTask(config, name = null, taskType = null) {
     // Determine task type from config or parameter
     const type = taskType || this.determineTaskType(config);
-    
+
     const task = {
       id: uuidv4(),
       name: name || this.generateTaskName(config, type),
@@ -56,9 +56,9 @@ class TaskManager {
 
   determineTaskType(config) {
     // Check if config has training-specific properties
-    if (config.class_list !== undefined || 
-        config.fully_annotated_files !== undefined || 
-        config.single_class_annotations !== undefined) {
+    if (config.class_list !== undefined ||
+      config.fully_annotated_files !== undefined ||
+      config.single_class_annotations !== undefined) {
       return TASK_TYPE.TRAINING;
     }
     return TASK_TYPE.INFERENCE;
@@ -94,7 +94,7 @@ class TaskManager {
 
     // Remove from queue if present
     this.queue = this.queue.filter(id => id !== taskId);
-    
+
     this.tasks.delete(taskId);
     this.saveTasks();
     this.notifyListeners('taskDeleted', { id: taskId });
@@ -107,7 +107,7 @@ class TaskManager {
     if (!task || task.status === TASK_STATUS.RUNNING) return false;
 
     // Update task status to queued
-    this.updateTask(taskId, { 
+    this.updateTask(taskId, {
       status: TASK_STATUS.QUEUED,
       progress: 'Queued for execution'
     });
@@ -130,7 +130,7 @@ class TaskManager {
 
     const taskId = this.queue.shift();
     const task = this.getTask(taskId);
-    
+
     if (!task || task.status === TASK_STATUS.CANCELLED) {
       // Task was deleted or cancelled, process next
       this.processQueue();
@@ -155,7 +155,7 @@ class TaskManager {
       });
 
       // Execute based on task type
-      const result = task.type === TASK_TYPE.TRAINING 
+      const result = task.type === TASK_TYPE.TRAINING
         ? await this.runTraining(task)
         : await this.runInference(task);
 
@@ -195,10 +195,10 @@ class TaskManager {
 
   async runInference(task) {
     const config = task.config;
-    
+
     // Generate unique process ID for this task
     const processId = `task_${task.id}_${Date.now()}`;
-    
+
     // Update task with process ID
     this.updateTask(task.id, { processId });
 
@@ -216,7 +216,7 @@ class TaskManager {
       // Create temporary config file
       const tempConfigPath = `/tmp/inference_config_${processId}.json`;
       const configData = {
-        model: config.model || 'BirdNET',
+        model: config.model,
         files: config.files || [],
         file_globbing_patterns: config.file_globbing_patterns || [],
         file_list: config.file_list || '',
@@ -288,7 +288,7 @@ class TaskManager {
 
         // Poll for completion
         const finalResult = await this.pollInferenceStatus(jobId, task.id);
-        
+
         if (finalResult.status === 'completed') {
           return {
             success: true,
@@ -340,13 +340,13 @@ class TaskManager {
       const poll = async () => {
         try {
           const response = await fetch(`http://localhost:8000/inference/status/${jobId}`);
-          
+
           if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
           }
-          
+
           const result = await response.json();
-          
+
           // Update task progress based on status
           if (result.status === 'running') {
             // Store system PID if available
@@ -374,7 +374,7 @@ class TaskManager {
           reject(new Error(`Failed to check inference status: ${error.message}`));
         }
       };
-      
+
       // Start polling
       poll();
     });
@@ -382,10 +382,10 @@ class TaskManager {
 
   async runTraining(task) {
     const config = task.config;
-    
+
     // Generate unique process ID for this task
     const processId = `training_${task.id}_${Date.now()}`;
-    
+
     // Update task with process ID
     this.updateTask(task.id, { processId });
 
@@ -479,7 +479,7 @@ class TaskManager {
 
         // Poll for completion
         const finalResult = await this.pollTrainingStatus(jobId, task.id);
-        
+
         if (finalResult.status === 'completed') {
           return {
             success: true,
@@ -531,13 +531,13 @@ class TaskManager {
       const poll = async () => {
         try {
           const response = await fetch(`http://localhost:8000/training/status/${jobId}`);
-          
+
           if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
           }
-          
+
           const result = await response.json();
-          
+
           // Update task progress based on status
           if (result.status === 'running') {
             // Store system PID if available
@@ -565,7 +565,7 @@ class TaskManager {
           reject(new Error(`Failed to check training status: ${error.message}`));
         }
       };
-      
+
       // Start polling
       poll();
     });
@@ -579,17 +579,17 @@ class TaskManager {
       // Cancel the running process via backend API
       if (task.processId) {
         try {
-          const endpoint = task.type === TASK_TYPE.TRAINING 
+          const endpoint = task.type === TASK_TYPE.TRAINING
             ? `http://localhost:8000/training/cancel/${task.processId}`
             : `http://localhost:8000/inference/cancel/${task.processId}`;
-          
+
           const response = await fetch(endpoint, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
             }
           });
-          
+
           if (!response.ok) {
             console.error(`Failed to cancel ${task.type} job via backend:`, response.statusText);
           }
@@ -631,11 +631,11 @@ class TaskManager {
   generateTaskName(config, taskType = TASK_TYPE.INFERENCE) {
     const modelName = config.model || 'Unknown';
     const timestamp = new Date().toLocaleString();
-    
+
     if (taskType === TASK_TYPE.TRAINING) {
       // Generate training task name
-      const classCount = Array.isArray(config.class_list) ? config.class_list.length : 
-                        (config.class_list ? config.class_list.split(/[,\n]/).filter(c => c.trim()).length : 0);
+      const classCount = Array.isArray(config.class_list) ? config.class_list.length :
+        (config.class_list ? config.class_list.split(/[,\n]/).filter(c => c.trim()).length : 0);
       const classDescription = classCount > 0 ? `${classCount} classes` : 'no classes';
       return `Training ${modelName} - ${classDescription} - ${timestamp}`;
     } else {
@@ -650,7 +650,7 @@ class TaskManager {
       } else {
         fileDescription = 'no files';
       }
-      
+
       return `${modelName} - ${fileDescription} - ${timestamp}`;
     }
   }
@@ -671,7 +671,7 @@ class TaskManager {
       if (tasksData) {
         const entries = JSON.parse(tasksData);
         this.tasks = new Map(entries);
-        
+
         // Rebuild queue from queued tasks
         this.rebuildQueue();
       }
@@ -690,7 +690,7 @@ class TaskManager {
     this.queue = queuedTasks.map(task => {
       // Reset running tasks to queued on startup
       if (task.status === TASK_STATUS.RUNNING) {
-        this.updateTask(task.id, { 
+        this.updateTask(task.id, {
           status: TASK_STATUS.QUEUED,
           progress: 'Reconnected - queued for execution',
           started: null  // Clear started timestamp so it gets a fresh start time
@@ -726,7 +726,7 @@ class TaskManager {
     // Only show currentTask if it's actually still running
     const currentTask = this.currentTask ? this.getTask(this.currentTask) : null;
     const isCurrentTaskRunning = currentTask && currentTask.status === TASK_STATUS.RUNNING;
-    
+
     return {
       currentTask: isCurrentTaskRunning ? currentTask : null,
       queueLength: this.queue.length,

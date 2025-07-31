@@ -80,11 +80,27 @@ def run_inference(files, model, config):
         raise
 
 
-def save_results(predictions, output_file):
+def save_results(predictions, config_data):
     """Save predictions to file"""
+    output_file = config_data.get("output_file")
+    sparse_threshold = config_data.get("sparse_save_threshold")
+
     if output_file:
         try:
-            predictions.to_csv(output_file)
+            if sparse_threshold is None:
+                # save all scores for all classes and clips
+                predictions.to_csv(output_file)
+            else:
+                # create sparse dataframe discarding clip scores below threshold
+                # save as pickle
+                predictions[predictions < sparse_threshold] = np.nan
+                sparse_df = predictions.astype(
+                    pd.SparseDtype("float", fill_value=np.nan)
+                )
+                sparse_df.to_pickle(output_file)
+
+                # Note: Load this pickled sparse df from file using:
+                # sparse_df_loaded = pd.read_pickle("sparse_df.pkl")
             logger.info(f"Predictions saved to: {output_file}")
         except Exception as e:
             logger.error(f"Failed to save predictions: {e}")
@@ -275,13 +291,13 @@ def main():
         Path(config_save_path).parent.mkdir(parents=True, exist_ok=True)
         with open(config_save_path, "w") as f:
             json.dump(config_data, f, indent=4)
-            
+
         # Run inference
         logger.info(f"Starting inference with model: {model_name}")
         predictions = run_inference(files, model, inference_config)
 
         # Save results
-        save_results(predictions, output_file)
+        save_results(predictions, inference_config)
 
         # Output summary for the GUI
         summary = {
