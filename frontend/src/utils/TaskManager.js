@@ -232,6 +232,7 @@ class TaskManager {
         config_output_path: configJsonPath,
         log_file_path: logFilePath,
         split_by_subfolder: config.split_by_subfolder || false,
+        subset_size: config.testing_mode_enabled ? config.subset_size : null,
         inference_settings: {
           clip_overlap: config.overlap || 0.0,
           batch_size: config.batch_size || 1,
@@ -429,6 +430,7 @@ class TaskManager {
         job_folder: jobFolder,
         config_output_path: configJsonPath,
         log_file_path: logFilePath,
+        subset_size: config.testing_mode_enabled ? config.subset_size : null,
         training_settings: {
           batch_size: config.batch_size || 32,
           num_workers: config.num_workers || 4,
@@ -668,7 +670,13 @@ class TaskManager {
 
   // Utility Methods
   generateTaskName(config, taskType = TASK_TYPE.INFERENCE) {
-    const modelName = config.model || 'Unknown';
+    let modelName;
+    if (config.model_source === 'bmz') {
+      // Use model name from BMZ config
+      modelName = config.model || 'Unknown';
+    } else{
+      modelName = "Local Model"
+    }
     const timestamp = new Date().toLocaleString();
 
     if (taskType === TASK_TYPE.TRAINING) {
@@ -678,7 +686,7 @@ class TaskManager {
       const classDescription = classCount > 0 ? `${classCount} classes` : 'no classes';
       return `Training ${modelName} - ${classDescription} - ${timestamp}`;
     } else {
-      // Generate inference task name
+      // Generate inference task names
       let fileDescription = '';
       if (config.files && config.files.length > 0) {
         fileDescription = `${config.files.length} files`;
@@ -690,7 +698,7 @@ class TaskManager {
         fileDescription = 'no files';
       }
 
-      return `${modelName} - ${fileDescription} - ${timestamp}`;
+      return `Inference ${modelName} - ${fileDescription} - ${timestamp}`;
     }
   }
 

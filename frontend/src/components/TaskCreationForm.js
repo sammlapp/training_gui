@@ -22,7 +22,9 @@ const DEFAULT_VALUES = {
     sparse_save_threshold: -3.,
     split_by_subfolder: false,
     use_custom_python_env: false,
-    custom_python_env_path: ''
+    custom_python_env_path: '',
+    testing_mode_enabled: false,
+    subset_size: 10
   }
 };
 
@@ -325,6 +327,10 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
           python_environment: {
             use_custom: config.use_custom_python_env,
             custom_path: config.custom_python_env_path
+          },
+          testing_mode: {
+            enabled: config.testing_mode_enabled,
+            subset_size: config.testing_mode_enabled ? config.subset_size : null
           }
         };
 
@@ -395,7 +401,9 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
             sparse_outputs_enabled: configData.sparse_outputs?.enabled || false,
             sparse_save_threshold: configData.sparse_outputs?.threshold || -3.0,
             use_custom_python_env: configData.python_environment?.use_custom || false,
-            custom_python_env_path: configData.python_environment?.custom_path || ''
+            custom_python_env_path: configData.python_environment?.custom_path || '',
+            testing_mode_enabled: configData.testing_mode?.enabled || false,
+            subset_size: configData.testing_mode?.subset_size || 10
           }));
 
           // Update file count based on loaded config
@@ -869,6 +877,38 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
                   {config.custom_python_env_path}
                 </span>
               )}
+            </div>
+          )}
+        </div>
+
+        {/* Testing Mode */}
+        <div className="form-group full-width">
+          <label>
+            <input
+              type="checkbox"
+              checked={config.testing_mode_enabled}
+              onChange={(e) => setConfig(prev => ({ ...prev, testing_mode_enabled: e.target.checked }))}
+              style={{ marginRight: '8px' }}
+            />
+            Testing Mode <HelpIcon section="inference-testing-mode" />
+          </label>
+          <div style={{ fontSize: '0.8rem', color: '#666', marginTop: '4px' }}>
+            Run inference on a small subset of files for quick testing
+          </div>
+          {config.testing_mode_enabled && (
+            <div className="form-group" style={{ marginTop: '8px', marginLeft: '24px' }}>
+              <label>Subset Size</label>
+              <input
+                type="number"
+                min="1"
+                max="1000"
+                value={config.subset_size}
+                onChange={(e) => setConfig(prev => ({ ...prev, subset_size: parseInt(e.target.value) }))}
+                style={{ width: '100px' }}
+              />
+              <div style={{ fontSize: '0.8rem', color: '#666', marginTop: '4px' }}>
+                Number of files to process (default: 10)
+              </div>
             </div>
           )}
         </div>

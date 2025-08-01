@@ -326,7 +326,16 @@ def run_training(config):
         # Set audio root if provided
         audio_root = config.get("root_audio_folder", None)
 
-        # training strategy dependds on whether the feature extractor is frozen
+        # Run on a small subset of data if specified
+        if "subset_size" in config and isinstance(config["subset_size"], int):
+            subset_size = min(config["subset_size"], len(train_df))
+            logger.info(
+                f"Using a SUBSET of {subset_size} samples for training and evaluation"
+            )
+            train_df = train_df.sample(n=subset_size, random_state=0)
+            evaluation_df = evaluation_df.sample(n=subset_size, random_state=0)
+
+        # training strategy depends on whether the feature extractor is frozen
         # if it is frozen, we can quickly train the classifier head on embeddings
         # if it is not frozen, we need to train the entire model
 
@@ -334,12 +343,14 @@ def run_training(config):
             logger.info(
                 "Feature extractor is frozen. Training will only update the classifier head (fast)."
             )
-            # Default epochs for shallow training
+            # Default epochs (steps) for shallow classifier fitting
+            # we typically train lots of steps since its very fast from here forward
+            # and we can use early stopping to avoid overfitting
             epochs = training_settings.get("epochs", 1000)
 
             # create embeddings once and use them for quickly training the classifier head
             # after fitting, this function loads the weights of the best step
-            fit_classifier_on_embeddings(
+            _, _, _, _, metrics = fit_classifier_on_embeddings(
                 embedding_model=model,
                 classifier_model=model.network.classifier,
                 train_df=train_df,
@@ -407,13 +418,12 @@ def run_training(config):
                 save_interval=-1,  # Only save best epoch (saves best.pkl)
                 audio_root=audio_root,
             )
+            metrics = model.valid_metrics[model.best_epoch]
 
         logger.info("Training completed successfully!")
 
         # Get validation metrics
-        if hasattr(model, "validation_metrics") and model.validation_metrics:
-            final_metrics = model.validation_metrics[-1]
-            logger.info(f"Final validation metrics: {final_metrics}")
+        logger.info(f"Final validation metrics: {metrics}")
 
         # Output summary for the GUI
         summary = {
@@ -424,11 +434,7 @@ def run_training(config):
             "validation_samples": len(evaluation_df),
             "classes_trained": config["class_list"],
             "epochs_completed": epochs,
-            "final_metrics": (
-                final_metrics
-                if hasattr(model, "validation_metrics") and model.validation_metrics
-                else {}
-            ),
+            "final_metrics": metrics,
         }
 
         logger.info("=" * 80)
@@ -438,8 +444,7 @@ def run_training(config):
         logger.info(f"Training samples processed: {len(train_df)}")
         logger.info(f"Validation samples: {len(evaluation_df)}")
         logger.info(f"Final timestamp: {datetime.datetime.now().isoformat()}")
-        if hasattr(model, "validation_metrics") and model.validation_metrics:
-            logger.info(f"Final validation metrics: {model.validation_metrics[-1]}")
+        logger.info(f"Final validation metrics: {metrics}")
         logger.info("=" * 80)
         print(json.dumps(summary))
 

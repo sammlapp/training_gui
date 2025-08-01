@@ -26,7 +26,10 @@ const DEFAULT_VALUES = {
     classifier_lr: 0.001,
     // Python environment settings
     use_custom_python_env: false,
-    custom_python_env_path: ''
+    custom_python_env_path: '',
+    // Testing mode settings
+    testing_mode_enabled: false,
+    subset_size: 10
   }
 };
 
@@ -326,6 +329,10 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
           python_environment: {
             use_custom: config.use_custom_python_env,
             custom_path: config.custom_python_env_path
+          },
+          testing_mode: {
+            enabled: config.testing_mode_enabled,
+            subset_size: config.testing_mode_enabled ? config.subset_size : null
           }
         };
 
@@ -399,7 +406,10 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
             classifier_lr: configData.training_settings?.classifier_lr || 0.001,
             // Python environment settings
             use_custom_python_env: configData.python_environment?.use_custom || false,
-            custom_python_env_path: configData.python_environment?.custom_path || ''
+            custom_python_env_path: configData.python_environment?.custom_path || '',
+            // Testing mode settings
+            testing_mode_enabled: configData.testing_mode?.enabled || false,
+            subset_size: configData.testing_mode?.subset_size || 10
           }));
 
           console.log(`Training config loaded from: ${configFile[0].split('/').pop()}`);
@@ -816,6 +826,38 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
                   {config.custom_python_env_path}
                 </span>
               )}
+            </div>
+          )}
+        </div>
+
+        {/* Testing Mode */}
+        <div className="form-group full-width">
+          <label>
+            <input
+              type="checkbox"
+              checked={config.testing_mode_enabled}
+              onChange={(e) => setConfig(prev => ({ ...prev, testing_mode_enabled: e.target.checked }))}
+              style={{ marginRight: '8px' }}
+            />
+            Testing Mode <HelpIcon section="training-testing-mode" />
+          </label>
+          <div className="help-text">
+            Train on a small subset of data for quick testing and validation
+          </div>
+          {config.testing_mode_enabled && (
+            <div className="form-group" style={{ marginTop: '8px', marginLeft: '24px' }}>
+              <label>Subset Size</label>
+              <input
+                type="number"
+                min="1"
+                max="10000"
+                value={config.subset_size}
+                onChange={(e) => setConfig(prev => ({ ...prev, subset_size: parseInt(e.target.value) }))}
+                style={{ width: '100px' }}
+              />
+              <div className="help-text">
+                Number of samples to use for training (default: 10)
+              </div>
             </div>
           )}
         </div>

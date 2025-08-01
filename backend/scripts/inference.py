@@ -307,6 +307,7 @@ def main():
                 raise ValueError("Model name for BMZ model not specified in config")
             model = load_bmz_model(model_name)
         elif model_source == "local_file":  # local file model
+            model_name = "local model"
             # Special case for local file model
             model_path = config_data.get("model", None)
             if not Path(model_path).is_file():
@@ -339,6 +340,12 @@ def main():
         Path(config_save_path).parent.mkdir(parents=True, exist_ok=True)
         with open(config_save_path, "w") as f:
             json.dump(config_data, f, indent=4)
+
+        # Run on a small subset of data if specified
+        if "subset_size" in config_data and config_data["subset_size"] is not None:
+            subset_size = min(config_data["subset_size"], len(files))
+            logger.info(f"Using a SUBSET of {subset_size} files as a test run")
+            files = np.random.choice(files, size=subset_size, replace=False).tolist()
 
         # Check if we should split by subfolder
         split_by_subfolder = config_data.get("split_by_subfolder", False)
