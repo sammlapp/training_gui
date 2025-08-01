@@ -20,7 +20,9 @@ const DEFAULT_VALUES = {
     output_dir: '',
     sparse_outputs_enabled: false,
     sparse_save_threshold: -3.,
-    split_by_subfolder: false
+    split_by_subfolder: false,
+    use_custom_python_env: false,
+    custom_python_env_path: ''
   }
 };
 
@@ -225,6 +227,17 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
     }
   };
 
+  const handleCustomPythonEnvSelection = async () => {
+    try {
+      const folder = await window.electronAPI.selectFolder();
+      if (folder) {
+        setConfig(prev => ({ ...prev, custom_python_env_path: folder }));
+      }
+    } catch (error) {
+      console.error('Failed to select Python environment folder:', error);
+    }
+  };
+
   const handleSubmit = (createAndRun = false) => {
     // Validate file selection based on mode
     const hasFiles = config.files.length > 0 ||
@@ -308,6 +321,10 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
           sparse_outputs: {
             enabled: config.sparse_outputs_enabled,
             threshold: config.sparse_save_threshold
+          },
+          python_environment: {
+            use_custom: config.use_custom_python_env,
+            custom_path: config.custom_python_env_path
           }
         };
 
@@ -376,7 +393,9 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
             batch_size: configData.inference_settings?.batch_size || 1,
             worker_count: configData.inference_settings?.num_workers || 1,
             sparse_outputs_enabled: configData.sparse_outputs?.enabled || false,
-            sparse_save_threshold: configData.sparse_outputs?.threshold || -3.0
+            sparse_save_threshold: configData.sparse_outputs?.threshold || -3.0,
+            use_custom_python_env: configData.python_environment?.use_custom || false,
+            custom_python_env_path: configData.python_environment?.custom_path || ''
           }));
 
           // Update file count based on loaded config
@@ -815,6 +834,44 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
           </div>
         </div>
 
+        {/* Python Environment */}
+        <div className="form-group full-width">
+          <label>
+            <input
+              type="checkbox"
+              checked={config.use_custom_python_env}
+              onChange={(e) => setConfig(prev => ({ ...prev, use_custom_python_env: e.target.checked }))}
+              style={{ marginRight: '8px' }}
+            />
+            Use Custom Python Environment <HelpIcon section="inference-python-env" />
+          </label>
+          <div style={{ fontSize: '0.8rem', color: '#666', marginTop: '4px' }}>
+            Use a custom Python environment instead of the default dipper_pytorch_env
+          </div>
+          {config.use_custom_python_env && (
+            <div className="file-selection" style={{ marginTop: '8px', marginLeft: '24px' }}>
+              <div className="file-selection-buttons">
+                <button onClick={handleCustomPythonEnvSelection}>
+                  Select Python Environment Folder
+                </button>
+                {config.custom_python_env_path && (
+                  <button
+                    onClick={() => setConfig(prev => ({ ...prev, custom_python_env_path: '' }))}
+                    className="button-clear"
+                    title="Clear selected Python environment"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+              {config.custom_python_env_path && (
+                <span className="selected-path" style={{ marginTop: '4px', display: 'block' }}>
+                  {config.custom_python_env_path}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
 
       </div>
 

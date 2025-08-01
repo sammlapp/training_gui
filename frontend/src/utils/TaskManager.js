@@ -259,16 +259,23 @@ class TaskManager {
       // Update progress
       this.updateTask(task.id, { progress: 'Setting up ML environment...' });
 
-      // Get environment paths using Electron userData directory
-      const envPathResult = await window.electronAPI.getEnvironmentPath('dipper_pytorch_env');
-      const archivePathResult = await window.electronAPI.getArchivePath('dipper_pytorch_env.tar.gz');
+      // Get environment paths - use custom environment if specified
+      let envPath, archivePath;
+      if (config.use_custom_python_env && config.custom_python_env_path) {
+        envPath = config.custom_python_env_path;
+        archivePath = ''; // No archive needed for custom environments
+      } else {
+        // Use default environment
+        const envPathResult = await window.electronAPI.getEnvironmentPath('dipper_pytorch_env');
+        const archivePathResult = await window.electronAPI.getArchivePath('dipper_pytorch_env.tar.gz');
 
-      if (!envPathResult.success || !archivePathResult.success) {
-        throw new Error('Failed to get environment paths');
+        if (!envPathResult.success || !archivePathResult.success) {
+          throw new Error('Failed to get environment paths');
+        }
+
+        envPath = envPathResult.path;
+        archivePath = archivePathResult.path;
       }
-
-      const envPath = envPathResult.path;
-      const archivePath = archivePathResult.path;
 
       // Update progress
       this.updateTask(task.id, { progress: 'Running inference...' });
@@ -450,16 +457,23 @@ class TaskManager {
       // Update progress
       this.updateTask(task.id, { progress: 'Setting up ML environment...' });
 
-      // Get environment paths using Electron userData directory
-      const envPathResult = await window.electronAPI.getEnvironmentPath('dipper_pytorch_env');
-      const archivePathResult = await window.electronAPI.getArchivePath('dipper_pytorch_env.tar.gz');
+      // Get environment paths - use custom environment if specified
+      let envPath, archivePath;
+      if (config.use_custom_python_env && config.custom_python_env_path) {
+        envPath = config.custom_python_env_path;
+        archivePath = ''; // No archive needed for custom environments
+      } else {
+        // Use default environment
+        const envPathResult = await window.electronAPI.getEnvironmentPath('dipper_pytorch_env');
+        const archivePathResult = await window.electronAPI.getArchivePath('dipper_pytorch_env.tar.gz');
 
-      if (!envPathResult.success || !archivePathResult.success) {
-        throw new Error('Failed to get environment paths');
+        if (!envPathResult.success || !archivePathResult.success) {
+          throw new Error('Failed to get environment paths');
+        }
+
+        envPath = envPathResult.path;
+        archivePath = archivePathResult.path;
       }
-
-      const envPath = envPathResult.path;
-      const archivePath = archivePathResult.path;
 
       // Update progress
       this.updateTask(task.id, { progress: 'Starting training...' });

@@ -23,7 +23,10 @@ const DEFAULT_VALUES = {
     n_augmentation_variants: 5,
     // Unfrozen feature extractor parameters
     feature_extractor_lr: 0.00001,
-    classifier_lr: 0.001
+    classifier_lr: 0.001,
+    // Python environment settings
+    use_custom_python_env: false,
+    custom_python_env_path: ''
   }
 };
 
@@ -195,6 +198,17 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
     }
   };
 
+  const handleCustomPythonEnvSelection = async () => {
+    try {
+      const folder = await window.electronAPI.selectFolder();
+      if (folder) {
+        setConfig(prev => ({ ...prev, custom_python_env_path: folder }));
+      }
+    } catch (error) {
+      console.error('Failed to select Python environment folder:', error);
+    }
+  };
+
   const handleSubmit = (createAndRun = false) => {
     // Validation
     const classList = getClassListArray();
@@ -308,6 +322,10 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
               feature_extractor_lr: config.feature_extractor_lr,
               classifier_lr: config.classifier_lr
             })
+          },
+          python_environment: {
+            use_custom: config.use_custom_python_env,
+            custom_path: config.custom_python_env_path
           }
         };
 
@@ -378,7 +396,10 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
             // Conditional parameters
             n_augmentation_variants: configData.training_settings?.n_augmentation_variants || 5,
             feature_extractor_lr: configData.training_settings?.feature_extractor_lr || 0.00001,
-            classifier_lr: configData.training_settings?.classifier_lr || 0.001
+            classifier_lr: configData.training_settings?.classifier_lr || 0.001,
+            // Python environment settings
+            use_custom_python_env: configData.python_environment?.use_custom || false,
+            custom_python_env_path: configData.python_environment?.custom_path || ''
           }));
 
           console.log(`Training config loaded from: ${configFile[0].split('/').pop()}`);
@@ -756,6 +777,45 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
               <div className="help-text">
                 Specify hidden layer sizes, e.g., "100,50" for two layers with 100 and 50 neurons
               </div>
+            </div>
+          )}
+        </div>
+
+        {/* Python Environment */}
+        <div className="form-group full-width">
+          <label>
+            <input
+              type="checkbox"
+              checked={config.use_custom_python_env}
+              onChange={(e) => setConfig(prev => ({ ...prev, use_custom_python_env: e.target.checked }))}
+              style={{ marginRight: '8px' }}
+            />
+            Use Custom Python Environment <HelpIcon section="training-python-env" />
+          </label>
+          <div className="help-text">
+            Use a custom Python environment instead of the default dipper_pytorch_env
+          </div>
+          {config.use_custom_python_env && (
+            <div className="file-selection" style={{ marginTop: '8px', marginLeft: '24px' }}>
+              <div className="file-selection-buttons">
+                <button onClick={handleCustomPythonEnvSelection}>
+                  Select Python Environment Folder
+                </button>
+                {config.custom_python_env_path && (
+                  <button
+                    onClick={() => setConfig(prev => ({ ...prev, custom_python_env_path: '' }))}
+                    className="button-clear"
+                    title="Clear selected Python environment"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+              {config.custom_python_env_path && (
+                <span className="selected-path" style={{ marginTop: '4px', display: 'block' }}>
+                  {config.custom_python_env_path}
+                </span>
+              )}
             </div>
           )}
         </div>
