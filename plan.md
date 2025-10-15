@@ -1,5 +1,5 @@
 This project will create a cross-platform desktop app that runs pytorch machine learning models and allows users to train models in an active learning loop. 
-
+  
 Conda environment: `conda activate train_gui`
 
 The project will use the bioacoustics model zoo for pre-trained bioacoustic identification models: https://github.com/kitzeslab/bioacoustics-model-zoo/
@@ -199,6 +199,8 @@ denoising and/or bandpassing for audio playback / review
 
 wandb integration with training & inference for logging progress and model evaluation: login on global settings page, specify user/project/run name/notes in configuration panel; if used, provide link to wandb page in task panels
 
+for clip review from query/explore mode: "add to cart" button on panel, adds the clip to an annotation "cart" that can be exported as an annotation task
+
 ## Extraction improvements:
 Stratification by folder metadata (eg 'primary period', 'secondary period','site', 'treatment group')
 
@@ -233,6 +235,8 @@ export default function BasicDateRangePicker() {
   
 
 ## app-wide updates
+Hawkears not loading offline - HTTP error something to do with download-cached-file I think
+
 - the multi-selects for filtering should use the same type of selector as the annotation panels, react-select
 
 review tab "undo" functionality? I think this would require tracking the full-page or single-clip annotations in a history so that we can sequentially undo and redo changes witch ctrl/cmd+z and ctrl/cmd+y
@@ -254,8 +258,8 @@ need to update BMZ version then update dependency
 - make sure none of the other features depend on electron
 - provide instructions for port forwarding to access the gui on a web browser
 - launch from CLI with argument for HTTP forwarding port
-- will need to refactor the backend: in desktop mode, use electronAPI, in remote server mode, use aiohttp or something for the API calls; extract shared functionality between the two modes to separate functions to avoid redundancy
-- Streamlit has some nice backend support for multiple users using the same hosted app, but ours will not. Think carefully about what would happen if multiple users used the app. This gets quite a bit more complicated
+- will need to refactor the backend: in desktop mode, use electronAPI, in remote server mode, use aiohttp or something for the API calls; extract shared functionality between the two modes to separate functions to avoid redundancy. Or write in a way that works for both. 
+- Streamlit has some nice backend support for multiple users using the same hosted app, but ours will not. Think carefully about what would happen if multiple users used the app on a multi-user machine. This gets quite a bit more complicated. Probably want to launch a separate instance of the app for each user/session and prevent multiple users from using the same session. 
 - would be huge if task management can be integrated across users; eg what if two people run the app on the same server, should have a central task management system and run jobs sequentially
 
 alternatively, could run backend on remote, run frontend locally, connect to backend via GUI on frontend. This seems more complicated overall because it requires more custom IPC.
@@ -270,13 +274,30 @@ alternatively, could run backend on remote, run frontend locally, connect to bac
 ## embedding: 
 add toggle in inference script to embed instead or in addition to classification
 
-## HOPLITE embedding, query, and shallow classification
+## HOPLITE embedding and shallow classification 
+(eventually add Query also)
 
-# updates for review tab
+ I have implemented functionalities for "embed audio to database" (mode='embed_to_hoplite') and "apply shallow classifier" (mode="classify_from_hoplite") modes in the inference.py script. We need to expose these functionalities to the user on the front end. In the Inference tab, we need to toggle between "End-toEnd Classification", "Embed to Database", and "Apply Shallow Classifier to Embedding DB" modes with a multi-select. Some of the inference paramters will be exposed depending on this selection.
+End-toEnd Classification: 
+- shows the current fields "Save sparse outputs" (checkbox) and "Separate inference by subfolders"
+- model selection is same as current (bmz model or local model)
+Embed to Database:
+- instead of Save sparse outputs and Separate inference by subfolders fields, shows multi-select for database selection: 
+- Create New Hoplite Database (user selects parent folder and enters name of new db in a text field)
+- Add embeddings to existing Hoplite Database (user selects an existing folder; system confirms that "hoplite.sqlite" file exists in the folder)
+and shows a text field for 'dataset name' 
+- model selection is same as current (bmz model or local model)
+Apply Shallow Classifier to Embedding DB:
+- user selects a folder containing the HopLite Embedding DB
+- user selects a shallow classification model file (extension: .mlp)
+- also shows the current fields "Save sparse outputs" (checkbox) and "Separate inference by subfolders"
+
+
+
+Otherwise, the task creation form remains the same. When Embed to database is selected in the multi-select, a different 
+## updates for review tab
 
 - reference frequency line not showing. To create the reference frequency line, should make the pixels maximal value at the relevant row of the spectrogram. 
-
-- there is small black line at bottom of every spectrogram, but only when resizing is enabled. Seems to be an issue with the backend spectrogram creation creating a row of zeros 
 
 consolidate the global theming options into a simple config or css file, so that I can make edits to the set of colors, fonts, font weights, font sizes, overall spacing values in one place for the entire app. 
 

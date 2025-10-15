@@ -10,12 +10,27 @@ import json
 import sys
 import os
 import torch
+import numpy as np
 
 import sklearn.model_selection
 from pathlib import Path
 import datetime
 from opensoundscape.ml.shallow_classifier import fit_classifier_on_embeddings
 from opensoundscape.ml.cnn import _gpu_if_available
+
+# local imports
+from load_model import load_model
+from config_utils import load_config_file
+from train_utils import (
+    check_clip_df_format,
+    process_fully_annotated_files,
+    process_single_class_annotations,
+    load_background_samples,
+    load_evaluation_data,
+)
+
+from opensoundscape.ml.shallow_classifier import MLPClassifier
+from opensoundscape.ml.cnn_architectures import set_layer_from_name
 
 # Set up logging
 logging.basicConfig(
@@ -28,160 +43,249 @@ logger = logging.getLogger(__name__)
 # configuration: might eventually expose these parameters
 max_background_samples = 10_000
 overlay_weight = (0.2, 0.5)
+early_stopping_patience = None  # no early stopping
 
 
-def check_clip_df_format(df):
-    assert df.index.names == (
-        "file",
-        "start_time",
-        "end_time",
-    ), f"expected the first 3 columns of the csv to be `file,start_time,end_time` but got {df.index.names}"
+def train_on_audio(model, train_labels, eval_labels, config):
+    train_cfg = config["training_settings"]
+    # Configure model for target classes
+    # if model.classes != config["class_list"]: (always initialize new classifier for now)
+    logger.info(
+        "Initializing new classifier head with random weights"  # , because classes differ from the loaded classifier head"
+    )
 
+    # changes .classes and updates metrics as needed; initializes 1-layer classifier
+    model.change_classes(config["class_list"])
 
-def load_config_file(config_path):
-    """Load training configuration from JSON file"""
-    try:
-        with open(config_path, "r") as f:
-            config = json.load(f)
-        return config
-    except Exception as e:
-        logger.error(f"Failed to load config file {config_path}: {e}")
-        raise
+    # initialize multi-layer classifier if needed:
+    hidden_layer_sizes = train_cfg.get("classifier_hidden_layer_sizes")
 
-
-def load_model(model_name):
-    """Load a model from the bioacoustics model zoo"""
-    try:
-        logger.info(f"Loading model: {model_name}")
-
-        # Import here to avoid import errors if not installed
-        import bioacoustics_model_zoo as bmz
-        import pydantic.deprecated.decorator  # Fix for pydantic error
-
-        # Load model using the same approach as inference
-        model = getattr(bmz, model_name)()
-        logger.info(f"Model loaded successfully: {type(model).__name__}")
-        return model
-    except ImportError as e:
-        logger.error(
-            f"Import error - make sure bioacoustics_model_zoo is installed: {e}"
+    if hidden_layer_sizes and len(hidden_layer_sizes) > 0:
+        assert all(
+            [isinstance(x, int) for x in hidden_layer_sizes]
+        ), "hidden_layer_sizes must be a list of integers"
+        new_classifier = MLPClassifier(
+            input_size=model.classifier.in_features,
+            output_size=len(config["class_list"]),
+            hidden_layer_sizes=hidden_layer_sizes,
         )
-        raise
-    except AttributeError as e:
-        logger.error(f"Model {model_name} not found in bioacoustics_model_zoo: {e}")
-        raise
-    except Exception as e:
-        logger.error(f"Failed to load model {model_name}: {e}")
-        raise
+        clf_layer_name = model.network.classifier_layer
+        set_layer_from_name(model.network, clf_layer_name, new_classifier)
 
+    # Set audio root if provided
+    audio_root = config.get("root_audio_folder", None)
 
-def process_fully_annotated_files(config):
-    """Load and process fully annotated files"""
-    fully_annotated_dfs = []
-
-    for f in config.get("fully_annotated_files", []):
-        logger.info(f"Loading fully annotated file: {f}")
-        df = pd.read_csv(f, index_col=[0, 1, 2])
-        check_clip_df_format(df)
-
-        # columns are either one per class with one-hot labels, or "labels" and "complete"
-        if "labels" in df.columns:
-            # parse labels column (list of strings) to list
-            import ast
-
-            df["labels"] = df["labels"].apply(ast.literal_eval)
-            df = df[df.complete == "complete"]
-
-            # use opensoundscape utility for labels to one-hot
-            from opensoundscape.annotations import categorical_to_multi_hot
-
-            multihot_labels = pd.DataFrame(
-                categorical_to_multi_hot(
-                    df["labels"].values, classes=config["class_list"], sparse=False
-                ),
-                index=df.index,
-                columns=config["class_list"],
-            )
-        else:
-            # df should have one-hot labels: just select the correct classes
-            multihot_labels = df[config["class_list"]]
-
-        fully_annotated_dfs.append(multihot_labels)
-
-    if fully_annotated_dfs:
-        return pd.concat(fully_annotated_dfs)[config["class_list"]]
-    else:
-        return pd.DataFrame(columns=config["class_list"])
-
-
-def process_single_class_annotations(config, labels):
-    """Load and process single class annotation files"""
-    # add labels where only one species was annotated
-    # treat other species as weak negatives
-    single_class_dfs = []
-
-    for annotation_item in config.get("single_class_annotations", []):
-        file_path = annotation_item["file"]
-        class_name = annotation_item["class"]
+    # training strategy depends on whether the feature extractor is frozen
+    # if it is frozen, we can quickly train the classifier head on embeddings
+    # if it is not frozen, we need to train the entire model
+    if config.get("freeze_feature_extractor", True):
+        logger.info("Freezing feature extractor")
+        model.freeze_feature_extractor()
 
         logger.info(
-            f"Loading single class annotation file: {file_path} for class: {class_name}"
+            "Feature extractor is frozen. Training will only update the classifier head (fast)."
         )
-        df = pd.read_csv(file_path, index_col=[0, 1, 2])
-        check_clip_df_format(df)
+        # Default epochs (steps) for shallow classifier fitting
+        # we typically train lots of steps since its very fast from here forward
+        # and we can use early stopping to avoid overfitting
+        epochs = train_cfg.get("epochs", 1000)
 
-        # remove incomplete or uncertain annotations
-        df = df[df.annotation.isin(["yes", "no"])]
+        # create embeddings once and use them for quickly training the classifier head
+        # after fitting, this function loads the weights of the best step
+        _, _, _, _, metrics = fit_classifier_on_embeddings(
+            embedding_model=model,
+            classifier_model=model.network.classifier,
+            train_df=train_labels,
+            validation_df=eval_labels,
+            n_augmentation_variants=train_cfg.get("n_augmentation_variants"),
+            audio_root=audio_root,
+            embedding_batch_size=train_cfg["batch_size"],
+            embedding_num_workers=train_cfg["num_workers"],
+            steps=epochs,
+            optimizer=None,
+            criterion=None,
+            device=model.device,
+            early_stopping_patience=early_stopping_patience,
+            logging_interval=100,
+            validation_interval=1,
+        )
 
-        # create one-hot df
-        new_labels = pd.DataFrame(index=df.index, columns=config["class_list"])
-        new_labels[class_name] = df["annotation"].map({"yes": 1, "no": 0})
+        # add class names to per-class metrics
+        metrics["per_class_auroc"] = {
+            class_name: metrics["per_class_auroc"][i]
+            for i, class_name in enumerate(config["class_list"])
+        }
 
-        # TODO: loss function should be able to handle NaNs by using a custom, small relative class weight
-        new_labels = new_labels.fillna(0)
-        single_class_dfs.append(new_labels)
+        # save the model
+        save_path = train_cfg["model_save_path"]
+        model.save(save_path, pickle=True)
+        logger.info(f"Saved trained model to: {save_path}")
+    else:
+        logger.info(
+            "Feature extractor is not frozen. Training will update the entire model (slow)."
+        )
+        # Default epochs for full training
+        epochs = train_cfg.get("epochs", 20)
+        try:
+            assert "class" in model.optimizer_params
+            # use AdamW optimizer with custom parameters
+            model.optimizer_params = {
+                "class": torch.optim.AdamW,
+                "kwargs": {"lr": train_cfg.get("feature_extractor_lr", 0.001)},
+                "classifier_lr": train_cfg.get("classifier_lr", 0.01),
+            }
+        except:
+            logger.warning(
+                "Model does not support custom optimizer parameters. Using default learning rate and optimizer."
+            )
+        try:
+            assert "class" in model.lr_scheduler_params
+            model.lr_scheduler_params = {
+                "class": torch.optim.lr_scheduler.CosineAnnealingLR,
+                "kwargs": {
+                    "T_max": epochs,
+                    "eta_min": train_cfg.get("min_lr", 1e-6),
+                },
+            }
+        except:
+            logger.warning(
+                "Model does not support custom learning rate scheduler parameters. Using default scheduler."
+            )
+        # Start training loop
+        logger.info("Starting model training...")
+        model_save_path = config.get("model_save_path")
+        out_dir = Path(model_save_path).parent
+        model.train(
+            train_labels,
+            eval_labels,
+            epochs=epochs,
+            batch_size=train_cfg["batch_size"],
+            num_workers=train_cfg["num_workers"],
+            save_path=out_dir,
+            save_interval=-1,  # Only save best epoch (saves best.pkl)
+            audio_root=audio_root,
+        )
+        metrics = model.valid_metrics[model.best_epoch]
 
-    if single_class_dfs:
-        single_labels = pd.concat(single_class_dfs)
-        # Combine with fully annotated labels
-        if not labels.empty:
-            labels = pd.concat([labels, single_labels])
-        else:
-            labels = single_labels
 
-    return labels
+def train_hoplite(train_labels, eval_labels, config):
+    # local hoplite imports as needed
+    from hoplite_utils import load_or_create_db
 
+    train_cfg = config["training_settings"]
 
-def load_background_samples(config):
-    """Load background samples if provided
+    # TODO: could avoid model load if all samples are already embedded
+    model = load_model(config)
 
-    This would typically be environmental noise with none of the classes present
+    # create db for training or connect to existing one
+    train_db = load_or_create_db(
+        config, embedding_dim=model.classifier.in_features, logger=logger
+    )
 
-    Samples are used for overlay (aka mixup) in which the sample is blended with a training sample
+    augmentation_variants = train_cfg.get("augmentation_variants")
 
-    # TODO: allow selecting a folder of audio or list of files instead of providing df?
-    """
-    background_samples_file = config.get("background_samples_file", "")
-    if background_samples_file and os.path.exists(background_samples_file):
-        logger.info(f"Loading background samples from: {background_samples_file}")
-        background_samples = pd.read_csv(background_samples_file, index_col=[0, 1, 2])
-        check_clip_df_format(background_samples)
+    # first, embed any samples not yet embedded
+    # or create multiple embeddings from augmented variants if specified
+    model.embed_to_hoplite_db(
+        eval_labels,
+        db=train_db,
+        dataset_name=config["eval_dataset_name"],
+        audio_root=config["root_audio_folder"],
+        batch_size=train_cfg["batch_size"],
+        num_workers=train_cfg["num_workers"],
+    )
 
-        # subset to a maximum of 10,000, which should be plenty of variety
-        if len(background_samples) > max_background_samples:
-            background_samples = background_samples.sample(n=max_background_samples)
+    if augmentation_variants is None:
+        logger.info("Embedding samples without augmentations...")
+        model.embed_to_hoplite_db(
+            train_labels,
+            db=train_db,
+            dataset_name=config["training_dataset_name"],
+            audio_root=config["root_audio_folder"],
+            batch_size=train_cfg["batch_size"],
+            num_workers=train_cfg["num_workers"],
+        )
+    else:
+        logger.info(
+            f"Embedding samples {augmentation_variants} times with augmentation..."
+        )
+        for i in range(augmentation_variants):
+            logger.info(f"Embedding augmentation variant {i+1}/{augmentation_variants}")
+            model.embed_to_hoplite_db(
+                train_labels,
+                db=train_db,
+                dataset_name=config["training_datset_name"],
+                audio_root=config["root_audio_folder"],
+                batch_size=train_cfg["batch_size"],
+                num_workers=train_cfg["num_workers"],
+                embedding_exists_mode="add",
+                bypass_augmentations=False,
+            )
 
-        return background_samples
-    return None
+    # second, retrieve train and eval features from db
+    index_values = []
+    train_embeddings = []
+    for f, s, e in train_labels.index:
+        ids = train_db.get_embeddings_by_source(
+            dataset_name=config["training_datset_name"],
+            source_id=f,
+            offsets=np.array([s], dtype=np.float16),
+        )
+        for id in ids:
+            emb = train_db.get_embedding(id)
+            train_embeddings.append(emb)
+            index_values.append((f, s, e))
+    train_embeddings = np.vstack(train_embeddings)
+    # might have had >1 emb per label, so reconstruct labels array
+    # based on index values for each embedding row
+    train_labels = train_labels.loc[index_values].values
 
+    eval_embeddings = []
+    for f, s, e in eval_labels.index:
+        ids = train_db.get_embeddings_by_source(
+            dataset_name=config["eval_datset_name"],
+            source_id=f,
+            offsets=np.array([s], dtype=np.float16),
+        )
+        assert len(ids) == 1
+        emb = train_db.get_embedding(id)
+        train_embeddings.append(emb)
+    eval_embeddings = np.vstack(eval_embeddings)
 
-def load_evaluation_data(config):
-    """Load evaluation data if provided"""
-    evaluation_file = config.get("evaluation_file", "")
-    if evaluation_file and os.path.exists(evaluation_file):
-        logger.info(f"Loading evaluation data from: {evaluation_file}")
-        return pd.read_csv(evaluation_file, index_col=[0, 1, 2])
-    return None
+    # third, train classifier
+    import opensoundscape as opso
+    import torch
+
+    # initialize an MLP with random weights and desired shape
+    classes = list(train_labels.columns)
+    hidden_layers = config.get("training_settings", {}).get(
+        "classifier_hidden_layer_sizes"
+    )
+    mlp = opso.ml.shallow_classifier.MLPClassifier(
+        input_size=train_db.embedding_dim,
+        output_size=len(classes),
+        hidden_layer_sizes=hidden_layers,
+        classes=classes,
+    )
+
+    val_metrics = mlp.fit(
+        train_embeddings,
+        train_labels.values,
+        validation_features=eval_embeddings,
+        validation_labels=eval_labels.values,
+        steps=1000,
+        batch_size=128,
+        logging_interval=200,
+        optimizer=torch.optim.Adam(mlp.parameters(), lr=0.001),
+        # criterion=opso.ml.loss.BCELossWeakNegatives(), #TODO: weak negatives loss!
+    )
+
+    mlp.save(config["model_save_path"])
+
+    logger.info(f"Trained classifier saved to {config['model_save_path']}")
+    logger.info(f"Validation set metrics: \n" + val_metrics)
+
+    return val_metrics
 
 
 def run_training(config):
@@ -209,28 +313,15 @@ def run_training(config):
         logger.info(f"Save location: {config.get('model_save_path')}")
 
         # Log configuration summary
-        training_settings = config.get("training_settings", {})
-        logger.info(f"Training settings:")
-        logger.info(f"  - Batch size: {training_settings.get('batch_size', 32)}")
-        logger.info(f"  - Number of workers: {training_settings.get('num_workers', 4)}")
-        logger.info(
-            f"  - Freeze feature extractor: {training_settings.get('freeze_feature_extractor', True)}"
-        )
-        logger.info(
-            f"  - Multi-layer classifier: {training_settings.get('classifier_hidden_layer_sizes') is not None}"
-        )
-        if training_settings.get("classifier_hidden_layer_sizes"):
-            logger.info(
-                f"  - Hidden layer sizes: {training_settings.get('classifier_hidden_layer_sizes')}"
-            )
-        logger.info("")
+        train_cfg = config.get("training_settings", {})
+        logger.info(f"Training settings: \n{train_cfg}")
 
         # Load and process annotation data
-        logger.info("Processing fully annotated files...")
-        labels = process_fully_annotated_files(config)
+        logger.info("Processing labels from fully annotated files...")
+        labels = process_fully_annotated_files(config, logger=logger)
 
-        logger.info("Processing single class annotations...")
-        labels = process_single_class_annotations(config, labels)
+        logger.info("Processing labels from single class annotations...")
+        labels = process_single_class_annotations(config, labels, logger=logger)
 
         if labels.empty:
             raise ValueError("No training data found. Please provide annotation files.")
@@ -239,11 +330,13 @@ def run_training(config):
         logger.info(f"Classes: {config['class_list']}")
 
         # Split data for training/validation
-        evaluation_df = load_evaluation_data(config)
+        evaluation_df = load_evaluation_data(config, logger=logger)
         if evaluation_df is None:
-            logger.info("No evaluation file provided, using train/validation split")
+            logger.info(
+                "No evaluation file provided, using 80:20 train/validation split"
+            )
             train_df, evaluation_df = sklearn.model_selection.train_test_split(
-                labels, test_size=0.2, random_state=42
+                labels, test_size=0.2
             )
         else:
             train_df = labels
@@ -251,53 +344,31 @@ def run_training(config):
                 f"Using provided evaluation set with {len(evaluation_df)} samples"
             )
 
+        # Run on a small subset of data if specified
+        if "subset_size" in config and isinstance(config["subset_size"], int):
+            subset_size = min(config["subset_size"], len(train_df))
+            logger.info(
+                f"Using a SUBSET of {subset_size} samples for training and evaluation"
+            )
+            train_df = train_df.sample(n=subset_size, random_state=0)
+            evaluation_df = evaluation_df.sample(n=subset_size, random_state=0)
+
         logger.info(f"Training samples: {len(train_df)}")
         logger.info(f"Validation samples: {len(evaluation_df)}")
 
         # Load pre-trained model
         model_name = config.get("model")
-        logger.info(f"Loading model: {model_name}")
-        model = load_model(model_name)
+        logger.info(f"Loading backbone model: {model_name}")
+        model = load_model(model_name, logger)
 
         logger.info(f" Using device: {model.device}")
 
-        # Configure model for target classes
-        # if model.classes != config["class_list"]: (always initialize new classifier for now)
-        logger.info(
-            "Initializing new classifier head with random weights"  # , because classes differ from the loaded classifier head"
-        )
-        from opensoundscape.ml.shallow_classifier import MLPClassifier
-        from opensoundscape.ml.cnn_architectures import set_layer_from_name
-
-        # changes .classes and updates metrics as needed; initializes 1-layer classifier
-        model.change_classes(config["class_list"])
-        # initialize multi-layer classifier if needed:
-
-        hidden_layer_sizes = config.get("training_settings", {}).get(
-            "classifier_hidden_layer_sizes"
-        )
-
-        if hidden_layer_sizes and len(hidden_layer_sizes) > 0:
-            assert all(
-                [isinstance(x, int) for x in hidden_layer_sizes]
-            ), "hidden_layer_sizes must be a list of integers"
-            new_classifier = MLPClassifier(
-                input_size=model.classifier.in_features,
-                output_size=len(config["class_list"]),
-                hidden_layer_sizes=hidden_layer_sizes,
-            )
-            clf_layer_name = model.network.classifier_layer
-            set_layer_from_name(model.network, clf_layer_name, new_classifier)
-
-        # Optionally freeze feature extractor
-        if training_settings.get("freeze_feature_extractor", True):
-            logger.info("Freezing feature extractor")
-            model.freeze_feature_extractor()
-
         # Customize preprocessing
 
-        # Load background samples (optional) for overlay
-        background_samples = load_background_samples(config)
+        # Load background samples for overlay (optional)
+        background_samples = load_background_samples(
+            config, max_background_samples=max_background_samples, logger=logger
+        )
         if background_samples is not None:
             from opensoundscape.preprocess.overlay import Overlay
 
@@ -317,114 +388,14 @@ def run_training(config):
                 action_index="background_sample_overlay",
                 action=overlay_action,
                 after_key="to_spec",
-            )
+            )  # TODO this will fail for models that take audio as input! need to implement audio-space mixup
 
-        # configure settings form config file or use defaults
-        batch_size = training_settings.get("batch_size", 32)
-        num_workers = training_settings.get("num_workers", 0)
-
-        # Set audio root if provided
-        audio_root = config.get("root_audio_folder", None)
-
-        # Run on a small subset of data if specified
-        if "subset_size" in config and isinstance(config["subset_size"], int):
-            subset_size = min(config["subset_size"], len(train_df))
-            logger.info(
-                f"Using a SUBSET of {subset_size} samples for training and evaluation"
-            )
-            train_df = train_df.sample(n=subset_size, random_state=0)
-            evaluation_df = evaluation_df.sample(n=subset_size, random_state=0)
-
-        # training strategy depends on whether the feature extractor is frozen
-        # if it is frozen, we can quickly train the classifier head on embeddings
-        # if it is not frozen, we need to train the entire model
-
-        if config.get("freeze_feature_extractor", True):
-            logger.info(
-                "Feature extractor is frozen. Training will only update the classifier head (fast)."
-            )
-            # Default epochs (steps) for shallow classifier fitting
-            # we typically train lots of steps since its very fast from here forward
-            # and we can use early stopping to avoid overfitting
-            epochs = training_settings.get("epochs", 1000)
-
-            # create embeddings once and use them for quickly training the classifier head
-            # after fitting, this function loads the weights of the best step
-            _, _, _, _, metrics = fit_classifier_on_embeddings(
-                embedding_model=model,
-                classifier_model=model.network.classifier,
-                train_df=train_df,
-                validation_df=evaluation_df,
-                n_augmentation_variants=training_settings.get(
-                    "n_augmentation_variants", 5
-                ),
-                audio_root=audio_root,
-                embedding_batch_size=batch_size,
-                embedding_num_workers=num_workers,
-                steps=epochs,
-                optimizer=None,
-                criterion=None,
-                device=model.device,  # auto-selected to GPU if available
-                early_stopping_patience=None,  # should we allow early stopping?
-                logging_interval=100,
-                validation_interval=1,
-            )
-
-            # add class names to per-class metrics
-            metrics["per_class_auroc"] = {
-                class_name: metrics["per_class_auroc"][i]
-                for i, class_name in enumerate(config["class_list"])
-            }
-
-            # save the model
-            model.save(model_save_path, pickle=True)
-            logger.info(f"Saved trained model to: {model_save_path}")
+        if config["mode"] == "train_on_embeddings":
+            metrics = train_hoplite(model, train_df, evaluation_df, config)
+        elif config["mode"] == "train_on_audio":
+            metrics = train_on_audio(model, train_df, evaluation_df, config)
         else:
-            logger.info(
-                "Feature extractor is not frozen. Training will update the entire model (slow)."
-            )
-            # Default epochs for full training
-            epochs = training_settings.get("epochs", 20)
-            try:
-                assert "class" in model.optimizer_params
-                # use AdamW optimizer with custom parameters
-                model.optimizer_params = {
-                    "class": torch.optim.AdamW,
-                    "kwargs": {
-                        "lr": training_settings.get("feature_extractor_lr", 0.001)
-                    },
-                    "classifier_lr": training_settings.get("classifier_lr", 0.01),
-                }
-            except:
-                logger.warning(
-                    "Model does not support custom optimizer parameters. Using default learning rate and optimizer."
-                )
-            try:
-                assert "class" in model.lr_scheduler_params
-                model.lr_scheduler_params = {
-                    "class": torch.optim.lr_scheduler.CosineAnnealingLR,
-                    "kwargs": {
-                        "T_max": epochs,
-                        "eta_min": training_settings.get("min_lr", 1e-6),
-                    },
-                }
-            except:
-                logger.warning(
-                    "Model does not support custom learning rate scheduler parameters. Using default scheduler."
-                )
-            # Start training loop
-            logger.info("Starting model training...")
-            model.train(
-                train_df,
-                evaluation_df,
-                epochs=epochs,
-                batch_size=batch_size,
-                num_workers=num_workers,
-                save_path=out_dir,
-                save_interval=-1,  # Only save best epoch (saves best.pkl)
-                audio_root=audio_root,
-            )
-            metrics = model.valid_metrics[model.best_epoch]
+            raise ValueError(f"Unsupported mode: {config['mode']}")
 
         logger.info("Training completed successfully!")
 
@@ -441,7 +412,7 @@ def run_training(config):
             "training_samples": len(train_df),
             "validation_samples": len(evaluation_df),
             "classes_trained": config["class_list"],
-            "epochs_completed": epochs,
+            # "epochs_completed": epochs,
             "final_metrics": metrics,
         }
 
@@ -480,7 +451,7 @@ def main():
     args = parser.parse_args()
 
     # Load configuration from file
-    config_data = load_config_file(args.config)
+    config_data = load_config_file(args.config, logger=logger)
 
     # Run training
     run_training(config_data)

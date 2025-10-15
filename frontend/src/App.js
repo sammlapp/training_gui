@@ -15,9 +15,9 @@ import ListItemText from '@mui/material/ListItemText';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import SchoolIcon from '@mui/icons-material/School';
 import ExploreIcon from '@mui/icons-material/Explore';
-import RateReviewIcon from '@mui/icons-material/RateReview';
+import RuleIcon from '@mui/icons-material/Rule';
 import HelpIcon from '@mui/icons-material/Help';
-import AssignmentIcon from '@mui/icons-material/Assignment';
+import ColorizeIcon from '@mui/icons-material/Colorize';
 import './App.css';
 import ExploreTab from './components/ExploreTab';
 import ReviewTab from './components/ReviewTab';
@@ -96,9 +96,9 @@ function App() {
   const tabs = [
     { id: 'inference', name: 'Inference', icon: <PlayArrowIcon /> },
     { id: 'training', name: 'Training', icon: <SchoolIcon /> },
-    { id: 'extraction', name: 'Extraction', icon: <AssignmentIcon /> },
+    { id: 'extraction', name: 'Extraction', icon: <ColorizeIcon /> },
     { id: 'explore', name: 'Explore', icon: <ExploreIcon /> },
-    { id: 'review', name: 'Review', icon: <RateReviewIcon /> },
+    { id: 'review', name: 'Review', icon: <RuleIcon /> },
     { id: 'help', name: 'Help', icon: <HelpIcon /> }
   ];
 

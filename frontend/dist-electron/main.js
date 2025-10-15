@@ -41,12 +41,12 @@ function getBundledPythonExecutable(scriptName = 'minimal_server') {
     // In production, Python executables are bundled with the app
     const resourcesPath = process.resourcesPath;
     const executablePath = path.join(resourcesPath, 'python-dist', scriptName);
-    
+
     if (fs.existsSync(executablePath)) {
       return executablePath;
     }
   }
-  
+
   return null;
 }
 
@@ -59,7 +59,7 @@ function getBundledPythonPath() {
 function getPythonCommand(scriptName) {
   // For the new architecture, we primarily use the lightweight_server HTTP API
   // This function is kept for compatibility but should only be used for the server itself
-  
+
   if (scriptName === 'lightweight_server') {
     const executablePath = getBundledPythonExecutable('lightweight_server');
     if (executablePath) {
@@ -69,7 +69,7 @@ function getPythonCommand(scriptName) {
       };
     }
   }
-  
+
   // Fall back to system Python with script path for any remaining direct script calls
   const pythonPath = getCondaPythonPath();
   return {
@@ -87,7 +87,7 @@ function getCondaPythonPath() {
     console.log(`Using bundled Python at: ${bundledPythonPath}`);
     return bundledPythonPath;
   }
-  
+
   // Fallback to system conda environments
   const homeDir = os.homedir();
   const possiblePaths = [
@@ -107,7 +107,7 @@ function getCondaPythonPath() {
     '/opt/anaconda3/envs/training_gui/bin/python',
     'python3' // Fallback to system python
   ];
-  
+
   console.log('Searching for conda python in these paths:');
   for (const pythonPath of possiblePaths) {
     console.log(`  Checking: ${pythonPath}`);
@@ -116,7 +116,7 @@ function getCondaPythonPath() {
       return pythonPath;
     }
   }
-  
+
   console.log('No conda python found, falling back to system python');
   return 'python3'; // Ultimate fallback
 }
@@ -126,10 +126,10 @@ async function createWindow() {
   console.log('NODE_ENV:', process.env.NODE_ENV);
   console.log('isDev:', isDev);
   console.log('app.isPackaged:', app.isPackaged);
-  
+
   // Start HTTP server for audio processing first
   await startHttpServer();
-  
+
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
@@ -141,10 +141,10 @@ async function createWindow() {
   });
 
   // Load the app
-  const startUrl = isDev 
-    ? 'http://localhost:3000' 
+  const startUrl = isDev
+    ? 'http://localhost:3000'
     : `file://${path.join(__dirname, '../build/index.html')}`;
-  
+
   console.log('Loading URL:', startUrl);
   mainWindow.loadURL(startUrl);
 
@@ -204,16 +204,16 @@ async function checkServerRunning(port) {
     }, (res) => {
       resolve(true);
     });
-    
+
     req.on('error', () => {
       resolve(false);
     });
-    
+
     req.on('timeout', () => {
       req.destroy();
       resolve(false);
     });
-    
+
     req.end();
   });
 }
@@ -224,17 +224,17 @@ async function startHttpServer() {
     console.log('HTTP server already running');
     return;
   }
-  
+
   // Check if server is already running (e.g., started directly with Python)
   const serverRunning = await checkServerRunning(HTTP_SERVER_PORT);
   if (serverRunning) {
     console.log(`HTTP server already running on port ${HTTP_SERVER_PORT} (external)`);
     return;
   }
-  
+
   try {
     let command, args;
-    
+
     if (isDev) {
       // In development, always use Python script directly for faster startup
       const pythonPath = getCondaPythonPath();
@@ -259,29 +259,29 @@ async function startHttpServer() {
         console.log(`Starting HTTP server (Python fallback): ${command} ${args.join(' ')}`);
       }
     }
-    
+
     httpServerProcess = spawn(command, args, {
       stdio: ['pipe', 'pipe', 'pipe'],
       cwd: path.join(process.cwd(), 'backend')
     });
-    
+
     httpServerProcess.stdout.on('data', (data) => {
       console.log(`HTTP Server stdout: ${data}`);
     });
-    
+
     httpServerProcess.stderr.on('data', (data) => {
       console.error(`HTTP Server stderr: ${data}`);
     });
-    
+
     httpServerProcess.on('close', (code) => {
       console.log(`HTTP server process exited with code ${code}`);
       httpServerProcess = null;
     });
-    
+
     // Wait for server to be ready
     console.log('Waiting for HTTP server to start...');
     await waitForServer();
-    
+
   } catch (error) {
     console.error('Failed to start HTTP server:', error);
   }
@@ -371,19 +371,19 @@ ipcMain.handle('generate-unique-folder-name', async (event, basePath, folderName
   // Generate a unique folder name by adding numeric suffix if needed
   let uniqueName = folderName;
   let counter = 1;
-  
+
   while (fs.existsSync(path.join(basePath, uniqueName))) {
     uniqueName = `${folderName}_${counter}`;
     counter++;
   }
-  
+
   return uniqueName;
 });
 
 ipcMain.handle('save-file', async (event, defaultName) => {
   // Determine file type from extension
   const isJsonFile = defaultName && defaultName.toLowerCase().includes('.json');
-  
+
   const result = await dialog.showSaveDialog(mainWindow, {
     defaultPath: defaultName,
     filters: isJsonFile ? [
@@ -402,7 +402,7 @@ ipcMain.handle('run-python-script', async (event, scriptPath, args, processId) =
     // Get script name without extension
     const scriptName = path.basename(scriptPath, '.py');
     const pythonCmd = getPythonCommand(scriptName);
-    
+
     let command, commandArgs;
     if (pythonCmd.needsScript) {
       command = pythonCmd.command;
@@ -411,36 +411,36 @@ ipcMain.handle('run-python-script', async (event, scriptPath, args, processId) =
       command = pythonCmd.command;
       commandArgs = args;
     }
-    
+
     console.log(`Running: ${command} ${commandArgs.join(' ')}`);
-    
+
     const process = spawn(command, commandArgs);
     pythonProcesses.set(processId, process);
-    
+
     let stdout = '';
     let stderr = '';
-    
+
     process.stdout.on('data', (data) => {
       const output = data.toString();
       stdout += output;
       // Send progress updates to renderer
-      mainWindow.webContents.send('python-output', { 
-        processId, 
-        type: 'stdout', 
-        data: output 
+      mainWindow.webContents.send('python-output', {
+        processId,
+        type: 'stdout',
+        data: output
       });
     });
-    
+
     process.stderr.on('data', (data) => {
       const output = data.toString();
       stderr += output;
-      mainWindow.webContents.send('python-output', { 
-        processId, 
-        type: 'stderr', 
-        data: output 
+      mainWindow.webContents.send('python-output', {
+        processId,
+        type: 'stderr',
+        data: output
       });
     });
-    
+
     process.on('close', (code) => {
       pythonProcesses.delete(processId);
       if (code === 0) {
@@ -449,7 +449,7 @@ ipcMain.handle('run-python-script', async (event, scriptPath, args, processId) =
         reject(new Error(`Python process exited with code ${code}: ${stderr}`));
       }
     });
-    
+
     process.on('error', (error) => {
       pythonProcesses.delete(processId);
       reject(error);
@@ -479,14 +479,14 @@ ipcMain.handle('test-python-path', async () => {
 ipcMain.handle('create-audio-clips', async (event, filePath, startTime, endTime, settings) => {
   return new Promise((resolve, reject) => {
     const pythonCmd = getPythonCommand('create_audio_clips');
-    
+
     const args = [
       '--file', filePath,
       '--start', startTime.toString(),
       '--end', endTime.toString(),
       '--settings', JSON.stringify(settings)
     ];
-    
+
     let command, commandArgs;
     if (pythonCmd.needsScript) {
       command = pythonCmd.command;
@@ -495,22 +495,22 @@ ipcMain.handle('create-audio-clips', async (event, filePath, startTime, endTime,
       command = pythonCmd.command;
       commandArgs = args;
     }
-    
+
     console.log(`Creating audio clips: ${command} ${commandArgs.join(' ')}`);
-    
+
     const process = spawn(command, commandArgs);
-    
+
     let stdout = '';
     let stderr = '';
-    
+
     process.stdout.on('data', (data) => {
       stdout += data.toString();
     });
-    
+
     process.stderr.on('data', (data) => {
       stderr += data.toString();
     });
-    
+
     process.on('close', (code) => {
       if (code === 0) {
         try {
@@ -523,7 +523,7 @@ ipcMain.handle('create-audio-clips', async (event, filePath, startTime, endTime,
         reject(new Error(`Audio clip creation failed: ${stderr}`));
       }
     });
-    
+
     process.on('error', (error) => {
       reject(error);
     });
@@ -544,13 +544,13 @@ ipcMain.handle('get-environment-path', async (event, envName) => {
   try {
     const userDataPath = app.getPath('userData');
     const envPath = path.join(userDataPath, 'envs', envName);
-    
+
     // Ensure the envs directory exists
     const envsDir = path.join(userDataPath, 'envs');
     if (!fs.existsSync(envsDir)) {
       fs.mkdirSync(envsDir, { recursive: true });
     }
-    
+
     return { success: true, path: envPath };
   } catch (error) {
     return { success: false, error: error.message };
@@ -561,13 +561,13 @@ ipcMain.handle('get-archive-path', async (event, archiveName) => {
   try {
     const userDataPath = app.getPath('userData');
     const archivePath = path.join(userDataPath, 'archives', archiveName);
-    
+
     // Ensure the archives directory exists
     const archivesDir = path.join(userDataPath, 'archives');
     if (!fs.existsSync(archivesDir)) {
       fs.mkdirSync(archivesDir, { recursive: true });
     }
-    
+
     return { success: true, path: archivePath };
   } catch (error) {
     return { success: false, error: error.message };
