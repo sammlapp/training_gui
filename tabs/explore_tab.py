@@ -91,6 +91,8 @@ class ExploreTab:
         self.selected_species = []
         self.available_species = []
         self.clips_to_display = []
+        self.species_select = None
+        self.clips_container = None
         
     def render(self):
         """Render the explore tab UI"""
@@ -154,13 +156,11 @@ class ExploreTab:
                 # Species selection
                 with ui.row().classes('w-full gap-2'):
                     ui.label('Species:')
-                    ui.select(
+                    self.species_select = ui.select(
                         options=[],
                         multiple=True,
                         value=[]
-                    ).classes('flex-grow').bind_value(self, 'selected_species').bind_options_from(
-                        self, 'available_species'
-                    ).on('update:model-value', self.apply_filters)
+                    ).classes('flex-grow').bind_value(self, 'selected_species').on('update:model-value', self.apply_filters)
                 
                 ui.button('Apply Filters', icon='filter_alt', on_click=self.apply_filters)
             
@@ -186,6 +186,10 @@ class ExploreTab:
                 self.available_species = sorted(self.data['species'].unique().tolist())
             elif 'class' in self.data.columns:
                 self.available_species = sorted(self.data['class'].unique().tolist())
+            
+            # Update species select options
+            if hasattr(self, 'species_select'):
+                self.species_select.options = self.available_species
             
             # Apply initial filters
             self.apply_filters()

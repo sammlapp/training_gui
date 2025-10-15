@@ -37,8 +37,8 @@ class BioacousticsApp:
         
     def setup_ui(self):
         """Setup the main user interface"""
-        # Dark mode by default
-        ui.dark_mode().enable()
+        # Use default theme (not dark mode for better compatibility)
+        # ui.dark_mode().enable()
         
         # Main page title
         with ui.header(elevated=True).classes('items-center justify-between'):
