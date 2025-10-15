@@ -89,11 +89,14 @@ class BioacousticsApp:
 
 
 # Create and run the application
-def main():
-    """Main entry point"""
+@ui.page('/')
+def index():
+    """Main page route"""
     app_instance = BioacousticsApp()
     app_instance.setup_ui()
-    
+
+
+if __name__ in {"__main__", "__mp_main__"}:
     # Run the app
     ui.run(
         title='Bioacoustics Training GUI',
@@ -101,7 +104,3 @@ def main():
         reload=False,
         show=False  # Don't auto-open browser in headless env
     )
-
-
-if __name__ in {"__main__", "__mp_main__"}:
-    main()
