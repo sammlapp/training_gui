@@ -9,6 +9,7 @@ from typing import List, Dict, Any, Optional
 from nicegui import ui, events
 import uuid
 import glob
+from .task_manager import task_manager, TaskStatus
 
 
 class InferenceTab:
@@ -51,6 +52,10 @@ class InferenceTab:
         self.patterns_textarea = None
         self.extension_checkboxes = []
         self.file_list_input = None
+        self.task_container = None
+        
+        # Task manager
+        self.task_manager = task_manager
         
     def render(self):
         """Render the inference tab UI"""
@@ -192,6 +197,9 @@ class InferenceTab:
                 ui.label('Running Tasks').classes('text-h6 mb-2')
                 with ui.column().classes('w-full gap-2') as self.task_container:
                     ui.label('No active tasks').classes('text-caption text-gray-500')
+        
+        # Set up periodic task update
+        ui.timer(2.0, self.update_task_display)
     
     def on_file_mode_change(self, e):
         """Handle file selection mode change"""
@@ -463,42 +471,41 @@ class InferenceTab:
         
         if not has_files:
             ui.notify('Please select audio files first', type='warning')
-            return
+            return None
         
         if self.file_count == 0:
             ui.notify('No audio files found with current selection', type='warning')
-            return
+            return None
         
         if not self.config.get('output_dir'):
             ui.notify('Please specify an output directory', type='warning')
-            return
+            return None
         
-        # Create task configuration
-        task_name = self.task_name.strip() if self.task_name.strip() else f'inference_task_{uuid.uuid4().hex[:8]}'
+        # Create task
+        task_name = self.task_name.strip() if self.task_name.strip() else None
+        task = self.task_manager.create_task('inference', self.config.copy(), task_name)
         
-        task_config = {
-            'task_name': task_name,
-            'config': self.config.copy()
-        }
-        
-        ui.notify(f'Task "{task_name}" created', type='positive')
-        return task_config
+        ui.notify(f'Task "{task["name"]}" created', type='positive')
+        self.update_task_display()
+        return task
     
-    def create_and_run_task(self):
+    async def create_and_run_task(self):
         """Create and run inference task"""
-        task_config = self.create_task()
-        if not task_config:
+        task = self.create_task()
+        if not task:
             return
         
-        # TODO: Implement actual task execution
-        # This would normally start a subprocess running the inference script
-        ui.notify(f'Starting inference task: {task_config["task_name"]}', type='info')
+        # Queue and run the task
+        ui.notify(f'Starting task: {task["name"]}', type='info')
+        await self.task_manager.queue_task(task['id'])
+        self.update_task_display()
     
     def save_config(self):
         """Save configuration to file"""
         try:
-            config_dir = Path('configs')
-            config_dir.mkdir(exist_ok=True)
+            # Create configs directory in user's home
+            config_dir = Path.home() / '.bioacoustics_gui' / 'configs'
+            config_dir.mkdir(parents=True, exist_ok=True)
             
             config_path = config_dir / 'inference_config.json'
             
@@ -516,11 +523,12 @@ class InferenceTab:
             ui.notify(f'Configuration saved to {config_path}', type='positive')
         except Exception as e:
             ui.notify(f'Error saving config: {e}', type='negative')
+            print(f'Save config error: {e}')
     
     def load_config(self):
         """Load configuration from file"""
         try:
-            config_path = Path('configs/inference_config.json')
+            config_path = Path.home() / '.bioacoustics_gui' / 'configs' / 'inference_config.json'
             
             if not config_path.exists():
                 ui.notify('No saved configuration found', type='warning')
@@ -533,16 +541,22 @@ class InferenceTab:
             self.file_selection_mode = config_data.get('file_selection_mode', 'files')
             self.selected_extensions = config_data.get('selected_extensions', ['wav', 'mp3', 'flac'])
             self.glob_patterns = config_data.get('glob_patterns_text', '')
-            self.config = config_data.get('config', {})
+            
+            # Load config but preserve the structure
+            loaded_config = config_data.get('config', {})
+            for key, value in loaded_config.items():
+                self.config[key] = value
             
             # Re-render file selection UI
-            self.file_selection_container.clear()
-            with self.file_selection_container:
-                self.render_file_selection_ui()
+            if hasattr(self, 'file_selection_container'):
+                self.file_selection_container.clear()
+                with self.file_selection_container:
+                    self.render_file_selection_ui()
             
             ui.notify('Configuration loaded', type='positive')
         except Exception as e:
             ui.notify(f'Error loading config: {e}', type='negative')
+            print(f'Load config error: {e}')
     
     def reset_form(self):
         """Reset form to default values"""
@@ -580,3 +594,45 @@ class InferenceTab:
             self.render_file_selection_ui()
         
         ui.notify('Form reset to defaults', type='info')
+    
+    def update_task_display(self):
+        """Update the task display with current tasks"""
+        if not self.task_container:
+            return
+        
+        tasks = self.task_manager.get_all_tasks()
+        
+        # Filter to only show inference tasks
+        inference_tasks = [t for t in tasks if t['type'] == 'inference']
+        
+        # Only show running and queued tasks
+        active_tasks = [t for t in inference_tasks if t['status'] in [TaskStatus.RUNNING, TaskStatus.QUEUED]]
+        
+        self.task_container.clear()
+        
+        with self.task_container:
+            if not active_tasks:
+                ui.label('No active tasks').classes('text-caption text-gray-500')
+            else:
+                for task in active_tasks:
+                    with ui.card().classes('w-full p-2 mb-2'):
+                        with ui.row().classes('w-full items-center justify-between'):
+                            with ui.column().classes('gap-1'):
+                                ui.label(task['name']).classes('font-bold')
+                                status_color = 'blue' if task['status'] == TaskStatus.RUNNING else 'purple'
+                                ui.label(f"Status: {task['status']}").classes(f'text-{status_color}-500 text-caption')
+                                if task['progress']:
+                                    ui.label(task['progress']).classes('text-caption')
+                            
+                            if task['status'] == TaskStatus.RUNNING:
+                                ui.button(
+                                    'Cancel',
+                                    icon='cancel',
+                                    on_click=lambda t=task: self.cancel_task(t['id'])
+                                ).props('flat color=negative size=sm')
+    
+    async def cancel_task(self, task_id: str):
+        """Cancel a running task"""
+        await self.task_manager.cancel_task(task_id)
+        self.update_task_display()
+        ui.notify('Task cancelled', type='info')
