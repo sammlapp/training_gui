@@ -26,9 +26,15 @@ class ClickableSpectrogramCard:
         self.comment = clip_data.get('comments', '')
         self.is_loaded = False
         
+        # UI elements to update
+        self.card_container = None
+        self.annotation_badge = None
+        self.label_select = None
+        
     def render(self):
         """Render the spectrogram card"""
-        with ui.card().classes('w-full'):
+        with ui.card().classes('w-full') as card:
+            self.card_container = card
             # File info
             file_name = Path(self.clip_data.get('file', 'Unknown')).name
             ui.label(file_name).classes('text-caption font-bold')
@@ -36,23 +42,12 @@ class ClickableSpectrogramCard:
                 f"{self.clip_data.get('start_time', 0):.2f}s - {self.clip_data.get('end_time', 0):.2f}s"
             ).classes('text-caption text-gray-600')
             
-            # Spectrogram (click-to-play)
-            if not self.is_loaded:
-                ui.button('Load', icon='play_circle', on_click=self.load_clip).classes('w-full mt-2')
-            else:
-                # Use interactive_image for click-to-play
-                self.spectrogram_img = ui.interactive_image(
-                    f'data:image/png;base64,{self.spectrogram_base64}',
-                    on_mouse=self.on_spectrogram_click,
-                    events=['click']
-                ).classes('w-full cursor-pointer').style('max-height: 200px')
-                
-                # Hidden audio element
-                self.audio_element = ui.audio(
-                    f'data:audio/wav;base64,{self.audio_base64}',
-                    controls=False,
-                    autoplay=False
-                ).style('display: none')
+            # Container for spectrogram that will be updated
+            with ui.column().classes('w-full mt-2') as self.spec_container:
+                if not self.is_loaded:
+                    ui.button('Load', icon='play_circle', on_click=self.load_clip).classes('w-full')
+                else:
+                    self._render_spectrogram()
             
             # Annotation controls
             if self.review_mode == 'binary':
@@ -69,16 +64,20 @@ class ClickableSpectrogramCard:
                     'uncertain': 'warning',
                     'unlabeled': 'grey'
                 }
-                ui.badge(self.annotation, color=annotation_colors.get(self.annotation, 'grey')).props('outline')
+                self.annotation_badge = ui.badge(
+                    self.annotation, 
+                    color=annotation_colors.get(self.annotation, 'grey')
+                ).props('outline')
             else:
                 # Multiclass mode
                 with ui.column().classes('w-full gap-1 mt-2'):
-                    ui.select(
-                        self.available_classes,
-                        label='Class',
+                    self.label_select = ui.select(
+                        options=self.available_classes,
+                        label='Select Classes',
                         multiple=True,
-                        value=self.get_current_labels()
-                    ).classes('w-full').on('update:model-value', self.on_labels_change)
+                        value=self.get_current_labels(),
+                        on_change=self.on_labels_change
+                    ).classes('w-full')
             
             # Comments field (if enabled)
             if self.show_comments:
@@ -87,6 +86,24 @@ class ClickableSpectrogramCard:
                     value=self.comment,
                     on_change=self.on_comment_change
                 ).classes('w-full mt-2').props('dense')
+    
+    def _render_spectrogram(self):
+        """Render the spectrogram and audio elements"""
+        if self.spectrogram_base64 and self.audio_base64:
+            # Use interactive_image for click-to-play
+            ui.interactive_image(
+                f'data:image/png;base64,{self.spectrogram_base64}',
+                on_mouse=self.on_spectrogram_click,
+                events=['click'],
+                cross=False
+            ).classes('w-full cursor-pointer').style('max-height: 200px; object-fit: contain;')
+            
+            # Hidden audio element
+            self.audio_element = ui.audio(
+                f'data:audio/wav;base64,{self.audio_base64}',
+                controls=False,
+                autoplay=False
+            ).style('display: none')
     
     def load_clip(self):
         """Load the audio clip and spectrogram"""
@@ -102,11 +119,17 @@ class ClickableSpectrogramCard:
             self.audio_base64 = audio_base64
             self.is_loaded = True
             
-            # Re-render to show spectrogram
+            # Clear the container and re-render
+            self.spec_container.clear()
+            with self.spec_container:
+                self._render_spectrogram()
+            
             ui.notify('Clip loaded - click to play', type='positive')
             
         except Exception as e:
             ui.notify(f'Error loading clip: {e}', type='negative')
+            import traceback
+            print(f"Error loading clip: {traceback.format_exc()}")
     
     def on_spectrogram_click(self, e: events.MouseEventArguments):
         """Handle click on spectrogram to play audio"""
@@ -117,6 +140,17 @@ class ClickableSpectrogramCard:
     def set_annotation(self, value: str):
         """Set annotation value"""
         self.annotation = value
+        # Update badge if it exists
+        if hasattr(self, 'annotation_badge') and self.annotation_badge:
+            annotation_colors = {
+                'yes': 'positive',
+                'no': 'negative', 
+                'uncertain': 'warning',
+                'unlabeled': 'grey'
+            }
+            self.annotation_badge.text = value
+            self.annotation_badge.props(f'color={annotation_colors.get(value, "grey")}')
+        
         if self.on_annotation_change:
             self.on_annotation_change(self.index, value)
     
@@ -133,9 +167,11 @@ class ClickableSpectrogramCard:
     
     def on_labels_change(self, e):
         """Handle multiclass label changes"""
+        # e.value contains the new selection
+        new_labels = e.value if hasattr(e, 'value') else []
         if self.on_annotation_change:
             import json
-            self.on_annotation_change(self.index, json.dumps(e.args))
+            self.on_annotation_change(self.index, json.dumps(new_labels))
     
     def on_comment_change(self, e):
         """Handle comment changes"""
@@ -163,6 +199,11 @@ class FocusViewClip:
         self.annotation = clip_data.get('annotation', 'unlabeled')
         self.comment = clip_data.get('comments', '')
         
+        # UI elements
+        self.spec_container = None
+        self.annotation_label = None
+        self.label_select = None
+        
     def render(self):
         """Render the focus view clip"""
         with ui.column().classes('w-full items-center'):
@@ -172,31 +213,12 @@ class FocusViewClip:
                 f"Time: {self.clip_data.get('start_time', 0):.2f}s - {self.clip_data.get('end_time', 0):.2f}s"
             ).classes('text-caption mb-4')
             
-            # Load clip button or spectrogram
-            if not self.spectrogram_base64:
-                ui.button('Load Clip', icon='play_circle', on_click=self.load_clip).classes('mb-4')
-            else:
-                # Large interactive spectrogram (click-to-play)
-                with ui.card().classes('mb-4'):
-                    ui.label('Click spectrogram to play audio').classes('text-caption text-gray-600 mb-2')
-                    self.spectrogram_img = ui.interactive_image(
-                        f'data:image/png;base64,{self.spectrogram_base64}',
-                        on_mouse=self.on_spectrogram_click,
-                        events=['click']
-                    ).classes('cursor-pointer').style('max-width: 900px; max-height: 400px')
-                
-                # Hidden audio element
-                self.audio_element = ui.audio(
-                    f'data:audio/wav;base64,{self.audio_base64}',
-                    controls=False,
-                    autoplay=False
-                ).style('display: none')
-                
-                # Visible audio controls
-                with ui.row().classes('items-center gap-4 mb-4'):
-                    ui.button(icon='play_arrow', on_click=lambda: self.audio_element.play()).props('round color=primary')
-                    ui.button(icon='pause', on_click=lambda: self.audio_element.pause()).props('round flat')
-                    ui.button(icon='replay', on_click=lambda: (self.audio_element.seek(0), self.audio_element.play())).props('round flat')
+            # Container for spectrogram
+            with ui.column().classes('w-full items-center') as self.spec_container:
+                if not self.spectrogram_base64:
+                    ui.button('Load Clip', icon='play_circle', on_click=self.load_clip).classes('mb-4')
+                else:
+                    self._render_spectrogram()
             
             # Annotation controls
             with ui.card().classes('w-full p-4 mb-4'):
@@ -209,15 +231,16 @@ class FocusViewClip:
                         ui.button('Uncertain', icon='help', on_click=lambda: self.set_annotation('uncertain')).props('color=warning')
                         ui.button('Unlabeled', icon='remove', on_click=lambda: self.set_annotation('unlabeled'))
                     
-                    ui.label(f'Current: {self.annotation.upper()}').classes('text-caption mt-2')
+                    self.annotation_label = ui.label(f'Current: {self.annotation.upper()}').classes('text-caption mt-2')
                 else:
                     # Multiclass mode
-                    ui.select(
-                        self.available_classes,
+                    self.label_select = ui.select(
+                        options=self.available_classes,
                         label='Select Classes',
                         multiple=True,
-                        value=self.get_current_labels()
-                    ).classes('w-full').on('update:model-value', self.on_labels_change)
+                        value=self.get_current_labels(),
+                        on_change=self.on_labels_change
+                    ).classes('w-full')
                 
                 # Comments field (if enabled)
                 if self.show_comments:
@@ -244,6 +267,32 @@ class FocusViewClip:
 - **K**: Next clip
                 ''').classes('text-caption')
     
+    def _render_spectrogram(self):
+        """Render the spectrogram and audio elements"""
+        if self.spectrogram_base64 and self.audio_base64:
+            # Large interactive spectrogram (click-to-play)
+            with ui.card().classes('mb-4'):
+                ui.label('Click spectrogram to play audio').classes('text-caption text-gray-600 mb-2')
+                ui.interactive_image(
+                    f'data:image/png;base64,{self.spectrogram_base64}',
+                    on_mouse=self.on_spectrogram_click,
+                    events=['click'],
+                    cross=False
+                ).classes('cursor-pointer').style('max-width: 900px; max-height: 400px; object-fit: contain;')
+            
+            # Hidden audio element
+            self.audio_element = ui.audio(
+                f'data:audio/wav;base64,{self.audio_base64}',
+                controls=False,
+                autoplay=False
+            ).style('display: none')
+            
+            # Visible audio controls
+            with ui.row().classes('items-center gap-4 mb-4'):
+                ui.button(icon='play_arrow', on_click=lambda: self.audio_element.play()).props('round color=primary')
+                ui.button(icon='pause', on_click=lambda: self.audio_element.pause()).props('round flat')
+                ui.button(icon='replay', on_click=lambda: (self.audio_element.seek(0), self.audio_element.play())).props('round flat')
+    
     def load_clip(self):
         """Load the audio clip and spectrogram"""
         try:
@@ -257,10 +306,17 @@ class FocusViewClip:
             self.spectrogram_base64 = spec_base64
             self.audio_base64 = audio_base64
             
-            ui.notify('Clip loaded - click spectrogram to play', type='positive')
+            # Clear the container and re-render
+            self.spec_container.clear()
+            with self.spec_container:
+                self._render_spectrogram()
+            
+            ui.notify('Clip loaded - click to play', type='positive')
             
         except Exception as e:
             ui.notify(f'Error loading clip: {e}', type='negative')
+            import traceback
+            print(f"Error loading clip: {traceback.format_exc()}")
     
     def on_spectrogram_click(self, e: events.MouseEventArguments):
         """Handle click on spectrogram to play audio"""
@@ -271,6 +327,10 @@ class FocusViewClip:
     def set_annotation(self, value: str):
         """Set annotation value"""
         self.annotation = value
+        # Update label if it exists
+        if hasattr(self, 'annotation_label') and self.annotation_label:
+            self.annotation_label.text = f'Current: {value.upper()}'
+        
         if self.on_annotation_change:
             self.on_annotation_change(value)
     
@@ -287,9 +347,11 @@ class FocusViewClip:
     
     def on_labels_change(self, e):
         """Handle multiclass label changes"""
+        # e.value contains the new selection
+        new_labels = e.value if hasattr(e, 'value') else []
         if self.on_annotation_change:
             import json
-            self.on_annotation_change(json.dumps(e.args))
+            self.on_annotation_change(json.dumps(new_labels))
     
     def on_comment_change(self, e):
         """Handle comment changes"""
