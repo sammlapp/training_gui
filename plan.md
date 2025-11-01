@@ -39,9 +39,23 @@ Review Tab:
 - in settings, add checkbox for auto-play in focus mode and implement this functionality
 - in focus mode, if in binary annotation mode: when an annotation is selected, automatically advance to next clip
 - in focus mode, comments are not saving/persisting after switching clips and coming back 
+- something breaks when I use the settings panel to change the number of columns in the grid audio clip layout. No clips display after this. 
+
+
+- button groups for yes/no/uncertain/unlabeled, with appropriate colors. Example:
+
+with ui.button_group().props('outline'):
+    ui.button('Yes', color='green').props('push')
+    ui.button('No', color='red').props('push')
+    ui.button('Uncertain', color='yellow').props('push')
+    ui.button('Unlabeled', color='grey').props('push')
+
+But the active label should have a solid color background to indicate which label is currently selected
 
 App layout
 - move tab navigation to a narrow left bar with icons
+
+
 
 ## minimal changes:
 allow tasks to run on parallel if user clicks run in parallel
@@ -53,52 +67,6 @@ allow tasks to run on parallel if user clicks run in parallel
 - the environment built with conda pack works. I can run /path/to/env/bin/python backend/scripts/predict.py --config /path/to/config.txt. It runs inference and creates the csv. 
 
 # Visual design
-
-For theming, let's switch to using Material UI components, icons, and theming throughout
-Installation: (I ran this myself)
-npm install @mui/material @emotion/react @emotion/styled
-
-Start by taking a close look at this Material UI "Dashboard" example project:
-https://github.com/mui/material-ui/tree/v7.2.0/docs/data/material/getting-started/templates/dashboard 
-Usage instructions (if we were using the example template):
-- Copy these folders (dashboard and shared-theme) into your project, or one of the example projects.
-- Make sure your project has the required dependencies: @mui/material, @mui/icons-material, @emotion/styled, @emotion/react, @mui/x-charts, @mui/x-date-pickers, @mui/x-data-grid, @mui/x-tree-view, dayjs
-- Import and use the Dashboard component.
-- 
-
-(we will eventually use date pickers and charts)
-
-Use default light color theme, for now. Use the icons from material-ui throughout.  
-
-For fonts let's switch to Monserrat, via FontSource
-
-I already ran npm install @fontsource-variable/montserrat
-
-We can import it in the entry point like this:
-import '@fontsource/monserrat/300.css';
-import '@fontsource/monserrat/400.css';
-import '@fontsource/monserrat/500.css';
-import '@fontsource/monserrat/700.css';
-
-Review tab visuals:
-- dB range slider still has poor appearance. use the react material-ui range slider
-- also throughout, switch to using the AutoComplete element from material-ui for multi-selects . example:
-<Autocomplete
-        multiple
-        id="tags-outlined"
-        options={speciesList}
-        getOptionLabel={(option) => option.title}
-        defaultValue={[speciesList]}
-        renderInput={(params) => (
-          <TextField
-            {...params}
-            label="select species"
-            placeholder="Selected labels"
-          />
-        )}
-      />
-(including the multi-selects for filtering by labels in Review tab)
-
 
 
 
