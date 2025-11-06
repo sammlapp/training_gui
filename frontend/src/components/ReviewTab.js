@@ -444,6 +444,15 @@ function ReviewTab({ drawerOpen = false }) {
     }
   }, [annotationData.length]); // Only depend on LENGTH, not content
 
+  // Track previous config to detect when user changes settings (vs just data updating)
+  const prevConfigRef = useRef({
+    enabled: false,
+    stratificationColumns: [],
+    sortStrategy: 'original',
+    scoreColumn: null,
+    maxClipsPerBin: 20
+  });
+
   // Generate stratified bins when classifier-guided mode config changes
   useEffect(() => {
     if (classifierGuidedMode.enabled && filteredAnnotationData.length > 0) {
@@ -454,7 +463,26 @@ function ReviewTab({ drawerOpen = false }) {
         maxClipsPerBin: classifierGuidedMode.maxClipsPerBin
       });
       setStratifiedBins(bins);
-      setCurrentBinIndex(0); // Reset to first bin
+
+      // Only reset to first bin if configuration changed (not just data updated)
+      const configChanged =
+        prevConfigRef.current.enabled !== classifierGuidedMode.enabled ||
+        JSON.stringify(prevConfigRef.current.stratificationColumns) !== JSON.stringify(classifierGuidedMode.stratificationColumns) ||
+        prevConfigRef.current.sortStrategy !== classifierGuidedMode.sortStrategy ||
+        prevConfigRef.current.scoreColumn !== classifierGuidedMode.scoreColumn ||
+        prevConfigRef.current.maxClipsPerBin !== classifierGuidedMode.maxClipsPerBin;
+
+      if (configChanged) {
+        setCurrentBinIndex(0); // Reset to first bin only when config changes
+        prevConfigRef.current = {
+          enabled: classifierGuidedMode.enabled,
+          stratificationColumns: [...classifierGuidedMode.stratificationColumns],
+          sortStrategy: classifierGuidedMode.sortStrategy,
+          scoreColumn: classifierGuidedMode.scoreColumn,
+          maxClipsPerBin: classifierGuidedMode.maxClipsPerBin
+        };
+      }
+      // Otherwise keep current bin index - just update bin contents with new annotation data
     } else {
       setStratifiedBins([]);
       setCurrentBinIndex(0);
@@ -930,18 +958,20 @@ function ReviewTab({ drawerOpen = false }) {
       shouldAutoplayNextClip.current = true;
     }
 
-    // Advance to next clip
+    // Advance to next clip within current page/bin
     if (activeClipIndexOnPage < currentPageData.length - 1) {
-      // Move to next clip on current page
+      // Move to next clip on current page/bin
       setActiveClipIndexOnPage(prev => prev + 1);
     } else {
-      // Last clip on page - go to next page and set first clip as active
-      if (currentPage < totalPages - 1) {
+      // Last clip on page/bin
+      // In classifier-guided mode, do NOT auto-advance to next bin
+      // In normal mode, advance to next page
+      if (!classifierGuidedMode.enabled && currentPage < totalPages - 1) {
         setCurrentPage(prev => prev + 1);
         // activeClipIndexOnPage will be reset to 0 by the useEffect
       }
     }
-  }, [currentPageData, activeClipIndexOnPage, handleAnnotationChange, currentPage, totalPages, gridModeAutoplay]);
+  }, [currentPageData, activeClipIndexOnPage, handleAnnotationChange, currentPage, totalPages, gridModeAutoplay, classifierGuidedMode.enabled]);
 
   // Navigate active clip within page
   const handleActiveClipNavigation = useCallback((direction) => {
