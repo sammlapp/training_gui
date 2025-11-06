@@ -982,6 +982,54 @@ function ReviewTab({ drawerOpen = false }) {
     }
   }, [activeClipIndexOnPage, currentPageData.length]);
 
+  // Jump to next incomplete bin in classifier-guided mode
+  const handleJumpToNextIncompleteBin = useCallback(() => {
+    if (!classifierGuidedMode.enabled || stratifiedBins.length === 0) return;
+
+    // Search for next incomplete bin starting from current + 1
+    for (let i = currentBinIndex + 1; i < stratifiedBins.length; i++) {
+      const bin = stratifiedBins[i];
+      const binCompleteStatus = isBinComplete(
+        bin.clips,
+        settings.review_mode,
+        {
+          strategy: classifierGuidedMode.completionStrategy,
+          targetCount: classifierGuidedMode.completionTargetCount,
+          targetLabels: classifierGuidedMode.completionTargetLabels
+        }
+      );
+
+      if (!binCompleteStatus) {
+        setCurrentBinIndex(i);
+        setActiveClipIndexOnPage(0); // Reset to first clip in new bin
+        return;
+      }
+    }
+
+    // No incomplete bin found after current - wrap around and search from beginning
+    for (let i = 0; i < currentBinIndex; i++) {
+      const bin = stratifiedBins[i];
+      const binCompleteStatus = isBinComplete(
+        bin.clips,
+        settings.review_mode,
+        {
+          strategy: classifierGuidedMode.completionStrategy,
+          targetCount: classifierGuidedMode.completionTargetCount,
+          targetLabels: classifierGuidedMode.completionTargetLabels
+        }
+      );
+
+      if (!binCompleteStatus) {
+        setCurrentBinIndex(i);
+        setActiveClipIndexOnPage(0); // Reset to first clip in new bin
+        return;
+      }
+    }
+
+    // All bins are complete - stay on current bin
+    console.log('All bins are complete');
+  }, [classifierGuidedMode, stratifiedBins, currentBinIndex, settings.review_mode]);
+
   // Bulk annotation function for current page
   const handleBulkAnnotation = useCallback((annotationValue) => {
     const currentData = currentPageData;
@@ -1114,14 +1162,21 @@ function ReviewTab({ drawerOpen = false }) {
             }
             break;
           case 'k':
-            // Cmd/Ctrl+K: next page/bin
-            if (classifierGuidedMode.enabled && stratifiedBins.length > 0) {
-              if (currentBinIndex < stratifiedBins.length - 1) {
-                setCurrentBinIndex(prev => prev + 1);
+            if (event.shiftKey) {
+              // Cmd/Ctrl+Shift+K: jump to next incomplete bin (CGL mode only)
+              if (classifierGuidedMode.enabled && stratifiedBins.length > 0) {
+                handleJumpToNextIncompleteBin();
               }
             } else {
-              if (currentPage < totalPages - 1) {
-                setCurrentPage(prev => prev + 1);
+              // Cmd/Ctrl+K: next page/bin
+              if (classifierGuidedMode.enabled && stratifiedBins.length > 0) {
+                if (currentBinIndex < stratifiedBins.length - 1) {
+                  setCurrentBinIndex(prev => prev + 1);
+                }
+              } else {
+                if (currentPage < totalPages - 1) {
+                  setCurrentPage(prev => prev + 1);
+                }
               }
             }
             break;
@@ -1197,7 +1252,7 @@ function ReviewTab({ drawerOpen = false }) {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [settings, isFocusMode, currentPage, totalPages, handleBulkAnnotation, handleSettingsChange, handleActiveClipAnnotation, handleActiveClipNavigation, classifierGuidedMode.enabled, stratifiedBins.length, currentBinIndex]);
+  }, [settings, isFocusMode, currentPage, totalPages, handleBulkAnnotation, handleSettingsChange, handleActiveClipAnnotation, handleActiveClipNavigation, handleJumpToNextIncompleteBin, classifierGuidedMode.enabled, stratifiedBins.length, currentBinIndex]);
 
   // Load current focus clip spectrogram when in focus mode
   useEffect(() => {
@@ -1577,10 +1632,20 @@ function ReviewTab({ drawerOpen = false }) {
         {classifierGuidedMode.enabled && currentBin && (
           <div className={`bin-status-display ${isBinCompleteStatus ? 'complete' : 'incomplete'}`}>
             <div className="bin-status-header">
-              <span className="bin-status-label">Bin {currentBinIndex + 1} of {stratifiedBins.length}</span>
-              <span className={`bin-completion-badge ${isBinCompleteStatus ? 'complete' : 'incomplete'}`}>
-                {isBinCompleteStatus ? '✓ Complete' : 'In Progress'}
-              </span>
+              <div className="bin-status-info">
+                <span className="bin-status-label"><b>Classifier Guided Listening</b> Bin {currentBinIndex + 1} of {stratifiedBins.length}</span>
+                <span className={`bin-completion-badge ${isBinCompleteStatus ? 'complete' : 'incomplete'}`}>
+                  {isBinCompleteStatus ? '✓ Complete' : 'In Progress'}
+                </span>
+              </div>
+              <button
+                className="jump-incomplete-btn"
+                onClick={handleJumpToNextIncompleteBin}
+                title="Jump to next incomplete bin (⌘⇧K)"
+              >
+                <span className="material-symbols-outlined">fast_forward</span>
+                Next Incomplete
+              </button>
             </div>
             <div className="bin-stratification-values">
               {Object.entries(currentBin.values).map(([key, value]) => (

@@ -12,6 +12,7 @@
   --medium-gray: #6b7280;
   --border: #d1d5db;
   --shadow: rgba(57, 87, 86, 0.1);
+  --primary-color: #5287f0;
 }
 
 * {
@@ -5627,6 +5628,14 @@ button:disabled {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 8px;
+  gap: 16px;
+}
+
+.bin-status-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
 }
 
 .bin-status-label {
@@ -5670,4 +5679,37 @@ button:disabled {
 .bin-value-tag strong {
   color: var(--primary-color);
   margin-right: 4px;
+}
+
+.jump-incomplete-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: var(--primary-color);
+  color: rgb(251, 253, 255);
+  border: none;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.jump-incomplete-btn:hover:not(:disabled) {
+  background: var(--primary-color);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+
+
+
+.jump-incomplete-btn:active {
+  transform: translateY(0);
+}
+
+.jump-incomplete-btn .material-symbols-outlined {
+  font-size: 18px;
 }
