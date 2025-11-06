@@ -3781,16 +3781,21 @@ button:disabled {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  /* Allow toolbar items to wrap to next line when window is narrow */
   padding: 0.5rem 1.5rem;
   background-color: var(--white);
   border-bottom: 1px solid var(--border);
   box-shadow: none;
-  gap: 1rem;
+  gap: 0.5rem 1rem;
+  /* vertical gap 0.5rem, horizontal gap 1rem for wrapped items */
   width: calc(100% - 65px);
   /* Adjust width to account for left offset */
   box-sizing: border-box;
   transition: left 0.2s ease, width 0.2s ease;
   /* Smooth transition when drawer expands */
+  min-height: 48px;
+  /* Minimum height to prevent layout shift */
 }
 
 /* Save Status Indicator */
@@ -3817,6 +3822,8 @@ button:disabled {
 /* Bulk Annotation Controls in Toolbar */
 .toolbar-bulk-controls {
   display: flex;
+  flex-wrap: wrap;
+  /* Allow bulk controls to wrap when space is tight */
   gap: 0.25rem;
   align-items: center;
   margin-left: 0.5rem;
@@ -4456,11 +4463,21 @@ button:disabled {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  flex-wrap: wrap;
+  /* Allow buttons within sections to wrap if needed */
 }
 
 .toolbar-center {
   flex: 1;
   justify-content: center;
+  /* Don't shrink below content size to prevent cramping */
+  min-width: fit-content;
+}
+
+.toolbar-left,
+.toolbar-right {
+  /* Allow left and right sections to shrink when space is tight */
+  min-width: fit-content;
 }
 
 .toolbar-btn {
