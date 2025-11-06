@@ -32,6 +32,7 @@ function ReviewTab({ drawerOpen = false }) {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [loadedPageData, setLoadedPageData] = useState([]);
   const [lastRenderedPage, setLastRenderedPage] = useState(0); // Track which page we last rendered to prevent flashing
+  const [lastRenderedFocusClipIndex, setLastRenderedFocusClipIndex] = useState(0); // Track which focus clip we last rendered
   const [isPageTransitioning, setIsPageTransitioning] = useState(false);
   const [isSettingsPanelOpen, setIsSettingsPanelOpen] = useState(false);
   const [rootAudioPath, setRootAudioPath] = useState('');
@@ -393,6 +394,8 @@ function ReviewTab({ drawerOpen = false }) {
       extractAvailableClasses(data);
       setCurrentPage(0);
       setLastRenderedPage(0); // Reset to page 0
+      setFocusClipIndex(0);
+      setLastRenderedFocusClipIndex(0); // Reset focus clip index
       setHasUnsavedChanges(false);
       // Clear loaded page data so it will load fresh
       setLoadedPageData([]);
@@ -477,6 +480,8 @@ function ReviewTab({ drawerOpen = false }) {
         extractAvailableClasses(data.clips);
         setCurrentPage(0);
         setLastRenderedPage(0); // Reset to page 0
+        setFocusClipIndex(0);
+        setLastRenderedFocusClipIndex(0); // Reset focus clip index
         setHasUnsavedChanges(false);
         // Clear loaded page data so it will load fresh
         setLoadedPageData([]);
@@ -756,6 +761,8 @@ function ReviewTab({ drawerOpen = false }) {
     setAppliedFilters(filters);
     setCurrentPage(0); // Reset to first page when filters are applied
     setLastRenderedPage(0); // Reset rendered page tracker
+    setFocusClipIndex(0);
+    setLastRenderedFocusClipIndex(0); // Reset focus clip index
   }, [filters]);
 
   // Clear filters function
@@ -769,6 +776,8 @@ function ReviewTab({ drawerOpen = false }) {
     setAppliedFilters(emptyFilters);
     setCurrentPage(0);
     setLastRenderedPage(0); // Reset rendered page tracker
+    setFocusClipIndex(0);
+    setLastRenderedFocusClipIndex(0); // Reset focus clip index
   }, []);
 
   // Check if filters have changed since last apply
@@ -999,6 +1008,8 @@ function ReviewTab({ drawerOpen = false }) {
           const filtered = prev.filter(loaded => loaded.clip_id !== clip.id);
           return [...filtered, loadedClip[0]];
         });
+        // Mark this clip as rendered now that it's loaded
+        setLastRenderedFocusClipIndex(focusClipIndex);
       }
     } catch (error) {
       console.error('Failed to load focus clip spectrogram:', error);
@@ -1986,23 +1997,36 @@ function ReviewTab({ drawerOpen = false }) {
             <>
               {isFocusMode ? (
                 // Focus Mode View - Centered
-                <div className="focus-view-container">
-                  <FocusView
-                    clipData={{
-                      ...filteredAnnotationData[focusClipIndex],
-                      // Find loaded spectrogram data for current clip
-                      ...loadedPageData.find(loaded => loaded.clip_id === filteredAnnotationData[focusClipIndex]?.id) || {}
-                    }}
-                    onAnnotationChange={handleFocusAnnotationChange}
-                    onCommentChange={handleFocusCommentChange}
-                    onNavigate={handleFocusNavigation}
-                    settings={settings}
-                    reviewMode={settings.review_mode}
-                    availableClasses={availableClasses}
-                    isLastClip={focusClipIndex === filteredAnnotationData.length - 1}
-                    autoAdvance={true}
-                  />
-                </div>
+                (() => {
+                  // Determine which clip to show - use same logic as grid mode
+                  const isOnNewClip = focusClipIndex !== lastRenderedFocusClipIndex;
+                  const currentClip = filteredAnnotationData[focusClipIndex];
+                  const hasLoadedNewClip = loadedPageData.some(loaded => loaded.clip_id === currentClip?.id);
+
+                  // Show old clip if we've navigated but new clip hasn't loaded yet
+                  const clipIndexToShow = (isOnNewClip && !hasLoadedNewClip) ? lastRenderedFocusClipIndex : focusClipIndex;
+                  const clipToShow = filteredAnnotationData[clipIndexToShow];
+
+                  return (
+                    <div className="focus-view-container">
+                      <FocusView
+                        clipData={{
+                          ...clipToShow,
+                          // Find loaded spectrogram data for the clip we're showing
+                          ...loadedPageData.find(loaded => loaded.clip_id === clipToShow?.id) || {}
+                        }}
+                        onAnnotationChange={handleFocusAnnotationChange}
+                        onCommentChange={handleFocusCommentChange}
+                        onNavigate={handleFocusNavigation}
+                        settings={settings}
+                        reviewMode={settings.review_mode}
+                        availableClasses={availableClasses}
+                        isLastClip={focusClipIndex === filteredAnnotationData.length - 1}
+                        autoAdvance={true}
+                      />
+                    </div>
+                  );
+                })()
               ) : (
                 // Grid Mode View
                 <>
