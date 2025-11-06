@@ -343,8 +343,7 @@ function ReviewTab({ drawerOpen = false }) {
     }
   }, []);
 
-  // Track when data actually changes (new file loaded) vs just annotations updated
-  const dataVersion = useRef(0);
+  // Track when data actually changes (new file loaded) to trigger spectrogram reload
   const [currentDataVersion, setCurrentDataVersion] = useState(0);
 
   // Load spectrograms when page/bin changes, new data loaded, settings change, or filtering changes
@@ -493,15 +492,10 @@ function ReviewTab({ drawerOpen = false }) {
     };
   }, [annotationData.length, currentSavePath]);
 
-  // Separate effect to detect when NEW data is loaded (not just annotations changed)
-  useEffect(() => {
-    // Only increment version when the data array length changes (new file loaded)
-    // This avoids reloading spectrograms when just annotations change
-    if (annotationData.length > 0 && dataVersion.current !== annotationData.length) {
-      dataVersion.current = annotationData.length;
-      setCurrentDataVersion(prev => prev + 1);
-    }
-  }, [annotationData.length]); // Only depend on LENGTH, not content
+  // Note: currentDataVersion is now incremented directly in the file loading functions
+  // (loadAndProcessCSV and loadAndProcessCSVFromFile) to ensure spectrograms load
+  // on initial file load. The previous approach of detecting length changes was flawed
+  // because it didn't work when loading a new file with the same number of clips.
 
   // Track previous config to detect when user changes settings (vs just data updating)
   const prevConfigRef = useRef({
@@ -613,6 +607,8 @@ function ReviewTab({ drawerOpen = false }) {
       // Clear save path when new annotation file is loaded
       setCurrentSavePath(null);
       localStorage.removeItem('review_autosave_location');
+      // Force spectrogram reload by incrementing data version
+      setCurrentDataVersion(prev => prev + 1);
     } catch (err) {
       setError('Failed to parse CSV file: ' + err.message);
     } finally {
@@ -705,6 +701,8 @@ function ReviewTab({ drawerOpen = false }) {
         // Clear save path when new annotation file is loaded
         setCurrentSavePath(null);
         localStorage.removeItem('review_autosave_location');
+        // Force spectrogram reload by incrementing data version
+        setCurrentDataVersion(prev => prev + 1);
       }
     } catch (err) {
       console.error('Failed to load annotation task:', err);
@@ -1202,6 +1200,15 @@ function ReviewTab({ drawerOpen = false }) {
             // Ctrl/Cmd+,: Open settings panel
             setIsSettingsPanelOpen(true);
             return;
+          case 'k':
+            if (event.shiftKey) {
+              // Cmd/Ctrl+Shift+K: jump to next incomplete bin (CGL mode only, works in both grid and focus)
+              if (classifierGuidedMode.enabled && stratifiedBins.length > 0) {
+                handleJumpToNextIncompleteBin();
+                return;
+              }
+            }
+            break;
         }
       }
 
@@ -1253,13 +1260,8 @@ function ReviewTab({ drawerOpen = false }) {
             }
             break;
           case 'k':
-            if (event.shiftKey) {
-              // Cmd/Ctrl+Shift+K: jump to next incomplete bin (CGL mode only)
-              if (classifierGuidedMode.enabled && stratifiedBins.length > 0) {
-                handleJumpToNextIncompleteBin();
-              }
-            } else {
-              // Cmd/Ctrl+K: next page/bin
+            // Cmd/Ctrl+K: next page/bin (grid mode only, Shift+K handled globally)
+            if (!event.shiftKey) {
               if (classifierGuidedMode.enabled && stratifiedBins.length > 0) {
                 if (currentBinIndex < stratifiedBins.length - 1) {
                   setCurrentBinIndex(prev => prev + 1);
@@ -2526,7 +2528,7 @@ function ReviewTab({ drawerOpen = false }) {
                           onChange={(e) => setCurrentBinIndex(parseInt(e.target.value))}
                           title="Go to bin"
                         >
-                          {stratifiedBins.map((bin, i) => (
+                          {stratifiedBins.map((_, i) => (
                             <option key={i} value={i}>
                               Bin {i + 1}
                             </option>

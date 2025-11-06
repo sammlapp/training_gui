@@ -79,25 +79,25 @@ Completed:
 - ✅ Bin info progress display with gradient background
 - ✅ Stat items and bin value display
 
-## Still To Do 🚧
+## Edge Cases - All Handled ✅
 
 ### 10. Edge Cases to Handle
-The following edge cases are already handled in the implementation:
+All edge cases are now handled in the implementation:
 - ✅ Empty bins - handled in `isBinComplete()` (returns true for empty bins)
 - ✅ No stratification columns selected - UI shows warning text
 - ✅ Invalid score column - handled in `sortClipsInBin()` (falls back to original order with console warning)
 - ✅ Completion strategy mismatch - validated in `isBinComplete()` (console warnings for mismatches)
-- ⚠️ Clear mode when loading new file - **NEEDS IMPLEMENTATION**
+- ✅ Clear mode when loading new file - CGL mode disabled automatically on file load
 - ✅ Filters applied - bins are generated from `filteredAnnotationData` so filters work correctly
+- ✅ Initial spectrogram loading - Fixed by incrementing `currentDataVersion` in file load functions
 
 ### 11. Optional UI/UX Enhancements
 These are optional polish items for future consideration:
-- Visual indicator when bin is complete (currently auto-advances)
-- Confirmation dialog before auto-advancing
-- Option to manually skip incomplete bins
-- Export results with bin information included
+- Visual indicator when bin is complete - ✅ **IMPLEMENTED** (green/grey status display)
+- Option to manually skip incomplete bins - ✅ **IMPLEMENTED** (Cmd+Shift+K shortcut and button)
+- Export results with bin information included - Could add bin metadata to CSV exports
 
-## Implementation Status
+## Implementation Status - COMPLETE ✅
 
 All core functionality has been implemented and tested:
 1. ✅ **Stratification utility module** - Complete with all functions
@@ -108,12 +108,30 @@ All core functionality has been implemented and tested:
 6. ✅ **Pagination display updates** - Bin info shown correctly
 7. ✅ **CSS Styling** - Comprehensive styling added
 8. ✅ **Build test** - React app builds successfully
+9. ✅ **Focus/Grid mode syncing** - Consistent clip and bin tracking
+10. ✅ **Jump to next incomplete bin** - Button and keyboard shortcut (Cmd+Shift+K)
+11. ✅ **Auto-save on bin changes** - Triggers correctly
+12. ✅ **Initial page loading** - Fixed spectrogram loading on new file open
 
-### Outstanding Item
-**Clear classifier-guided mode when loading new file**: Need to add logic to reset `classifierGuidedMode.enabled` to `false` when new annotation data is loaded.
+## Recent Fixes
+
+### Fix: Initial Spectrograms Not Loading (2025-11-06)
+**Problem**: When opening a new annotation file, the first page of spectrograms wouldn't load until changing pages.
+
+**Root Cause**: The spectrogram loading effect depended on `currentDataVersion`, but there was a flawed detection mechanism that only incremented the version when `annotationData.length` changed. This failed when loading a new file with the same number of clips as the previous file.
+
+**Solution**:
+- Added `setCurrentDataVersion(prev => prev + 1)` directly in both file loading functions:
+  - `loadAndProcessCSVFromFile()` (line 617)
+  - `loadAndProcessCSV()` (line 711)
+- Removed the flawed automatic detection effect
+- Removed unused `dataVersion` ref
+
+**Files Modified**: `/frontend/src/components/ReviewTab.js`
 
 ## Notes
 - Bin completion checking runs on every annotation change (via effect)
-- Auto-advance has 500ms delay to show completion state
-- Bins are regenerated when config changes
-- Mode should be disabled when loading new file (add to clear logic)
+- Auto-advance functionality was removed per user request (replaced with visual status)
+- Bins are regenerated when config changes, but bin index is preserved
+- CGL mode is automatically disabled when loading new file
+- All columns from CSV are preserved and available for stratification and export
