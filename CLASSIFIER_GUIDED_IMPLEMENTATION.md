@@ -129,9 +129,38 @@ All core functionality has been implemented and tested:
 
 **Files Modified**: `/frontend/src/components/ReviewTab.js`
 
+### Enhancement: Bin Progress Display (2025-11-06)
+**Added Features**:
+1. **Clip Position Indicator**: Shows "Clip X of Y" within current bin
+   - Appears next to bin number in upper left
+   - Updates dynamically as user navigates through clips
+   - Works in both grid and focus modes
+
+2. **Bin Completion Statistics**: Shows "Completed bins: X/Y" in lower right
+   - Displays total completed bins vs total bins
+   - Updates as user completes bins
+   - Works in both grid and focus modes
+
+3. **Disabled "Next Incomplete" Button**:
+   - Button automatically disables when all bins are complete
+   - Visual feedback with greyed-out appearance
+   - Tooltip changes to "All bins complete"
+
+**Implementation Details**:
+- Added `getCompletedBinsCount()` helper to count completed bins (line 1043)
+- Added `getActiveClipIndexInBin()` helper to find clip position within bin (line 1064)
+- Updated grid mode bin display with new info (lines 1781-1814)
+- Updated focus mode bin display with new info (lines 2735-2768)
+- Added CSS styles for `.bin-clip-position`, `.bin-completion-stats`, and `.jump-incomplete-btn:disabled`
+
+**Files Modified**:
+- `/frontend/src/components/ReviewTab.js`
+- `/frontend/src/App.css`
+
 ## Notes
 - Bin completion checking runs on every annotation change (via effect)
 - Auto-advance functionality was removed per user request (replaced with visual status)
 - Bins are regenerated when config changes, but bin index is preserved
 - CGL mode is automatically disabled when loading new file
 - All columns from CSV are preserved and available for stratification and export
+- Clip position and bin statistics update in real-time as user works through bins

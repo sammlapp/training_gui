@@ -5661,6 +5661,12 @@ button:disabled {
   color: var(--dark);
 }
 
+.bin-clip-position {
+  font-weight: 400;
+  color: #666;
+  font-size: 0.9rem;
+}
+
 .bin-completion-badge {
   padding: 4px 12px;
   border-radius: 16px;
@@ -5698,6 +5704,16 @@ button:disabled {
   margin-right: 4px;
 }
 
+.bin-completion-stats {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  font-size: 0.9rem;
+  color: #666;
+  text-align: right;
+  font-weight: 500;
+}
+
 .jump-incomplete-btn {
   display: flex;
   align-items: center;
@@ -5718,6 +5734,13 @@ button:disabled {
   background: var(--primary-color);
   transform: translateY(-1px);
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.jump-incomplete-btn:disabled {
+  background: #bdbdbd;
+  color: #757575;
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 

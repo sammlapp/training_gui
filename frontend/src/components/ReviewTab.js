@@ -1039,6 +1039,42 @@ function ReviewTab({ drawerOpen = false }) {
     }
   }, [activeClipIndexOnPage, currentPageData.length]);
 
+  // Count completed bins in classifier-guided mode
+  const getCompletedBinsCount = useCallback(() => {
+    if (!classifierGuidedMode.enabled || stratifiedBins.length === 0) {
+      return { completed: 0, total: 0 };
+    }
+
+    const completedCount = stratifiedBins.filter(bin => {
+      return isBinComplete(
+        bin.clips,
+        settings.review_mode,
+        {
+          strategy: classifierGuidedMode.completionStrategy,
+          targetCount: classifierGuidedMode.completionTargetCount,
+          targetLabels: classifierGuidedMode.completionTargetLabels
+        }
+      );
+    }).length;
+
+    return { completed: completedCount, total: stratifiedBins.length };
+  }, [classifierGuidedMode, stratifiedBins, settings.review_mode]);
+
+  // Get the active clip index within the current bin (1-based for display)
+  const getActiveClipIndexInBin = useCallback((binIndex, clipId) => {
+    if (!classifierGuidedMode.enabled || stratifiedBins.length === 0 || binIndex >= stratifiedBins.length) {
+      return { clipIndex: 0, totalClips: 0 };
+    }
+
+    const bin = stratifiedBins[binIndex];
+    const clipIndexInBin = bin.clips.findIndex(clip => clip.id === clipId);
+
+    return {
+      clipIndex: clipIndexInBin !== -1 ? clipIndexInBin + 1 : 1, // 1-based for display
+      totalClips: bin.clips.length
+    };
+  }, [classifierGuidedMode, stratifiedBins]);
+
   // Jump to next incomplete bin in classifier-guided mode
   const handleJumpToNextIncompleteBin = useCallback(() => {
     if (!classifierGuidedMode.enabled || stratifiedBins.length === 0) return;
@@ -1730,6 +1766,14 @@ function ReviewTab({ drawerOpen = false }) {
       }
     ) : false;
 
+    // Get bin completion stats
+    const binCompletionStats = getCompletedBinsCount();
+    const allBinsComplete = binCompletionStats.completed === binCompletionStats.total && binCompletionStats.total > 0;
+
+    // Get active clip info within bin
+    const activeClip = dataToShow[activeClipIndexOnPage];
+    const activeClipInBin = activeClip ? getActiveClipIndexInBin(currentBinIndex, activeClip.id) : { clipIndex: 0, totalClips: 0 };
+
     return (
       <>
         {/* Bin Status Display for Classifier-Guided Mode */}
@@ -1737,7 +1781,12 @@ function ReviewTab({ drawerOpen = false }) {
           <div className={`bin-status-display ${isBinCompleteStatus ? 'complete' : 'incomplete'}`}>
             <div className="bin-status-header">
               <div className="bin-status-info">
-                <span className="bin-status-label"><b>Classifier Guided Listening</b> Bin {currentBinIndex + 1} of {stratifiedBins.length}</span>
+                <span className="bin-status-label">
+                  <b>Classifier Guided Listening</b> Bin {currentBinIndex + 1} of {stratifiedBins.length}
+                  {activeClipInBin.totalClips > 0 && (
+                    <span className="bin-clip-position"> • Clip {activeClipInBin.clipIndex} of {activeClipInBin.totalClips}</span>
+                  )}
+                </span>
                 <span className={`bin-completion-badge ${isBinCompleteStatus ? 'complete' : 'incomplete'}`}>
                   {isBinCompleteStatus ? '✓ Complete' : 'In Progress'}
                 </span>
@@ -1745,7 +1794,8 @@ function ReviewTab({ drawerOpen = false }) {
               <button
                 className="jump-incomplete-btn"
                 onClick={handleJumpToNextIncompleteBin}
-                title="Jump to next incomplete bin (⌘⇧K)"
+                disabled={allBinsComplete}
+                title={allBinsComplete ? "All bins complete" : "Jump to next incomplete bin (⌘⇧K)"}
               >
                 <span className="material-symbols-outlined">fast_forward</span>
                 Next Incomplete
@@ -1757,6 +1807,9 @@ function ReviewTab({ drawerOpen = false }) {
                   <strong>{key}:</strong> {String(value)}
                 </span>
               ))}
+            </div>
+            <div className="bin-completion-stats">
+              Completed bins: {binCompletionStats.completed}/{binCompletionStats.total}
             </div>
           </div>
         )}
@@ -2668,6 +2721,13 @@ function ReviewTab({ drawerOpen = false }) {
                     }
                   }
 
+                  // Get bin completion stats for focus mode
+                  const focusBinCompletionStats = getCompletedBinsCount();
+                  const focusAllBinsComplete = focusBinCompletionStats.completed === focusBinCompletionStats.total && focusBinCompletionStats.total > 0;
+
+                  // Get active clip info within bin for focus mode
+                  const focusActiveClipInBin = clipToShow ? getActiveClipIndexInBin(focusBinIndex, clipToShow.id) : { clipIndex: 0, totalClips: 0 };
+
                   return (
                     <div className="focus-view-container">
                       {/* Bin Status Display for Classifier-Guided Mode in Focus View */}
@@ -2675,7 +2735,12 @@ function ReviewTab({ drawerOpen = false }) {
                         <div className={`bin-status-display ${isFocusBinComplete ? 'complete' : 'incomplete'}`}>
                           <div className="bin-status-header">
                             <div className="bin-status-info">
-                              <span className="bin-status-label">Bin {focusBinIndex + 1} of {stratifiedBins.length}</span>
+                              <span className="bin-status-label">
+                                Bin {focusBinIndex + 1} of {stratifiedBins.length}
+                                {focusActiveClipInBin.totalClips > 0 && (
+                                  <span className="bin-clip-position"> • Clip {focusActiveClipInBin.clipIndex} of {focusActiveClipInBin.totalClips}</span>
+                                )}
+                              </span>
                               <span className={`bin-completion-badge ${isFocusBinComplete ? 'complete' : 'incomplete'}`}>
                                 {isFocusBinComplete ? '✓ Complete' : 'In Progress'}
                               </span>
@@ -2683,7 +2748,8 @@ function ReviewTab({ drawerOpen = false }) {
                             <button
                               className="jump-incomplete-btn"
                               onClick={handleJumpToNextIncompleteBin}
-                              title="Jump to next incomplete bin (⌘⇧K)"
+                              disabled={focusAllBinsComplete}
+                              title={focusAllBinsComplete ? "All bins complete" : "Jump to next incomplete bin (⌘⇧K)"}
                             >
                               <span className="material-symbols-outlined">fast_forward</span>
                               Next Incomplete
@@ -2695,6 +2761,9 @@ function ReviewTab({ drawerOpen = false }) {
                                 <strong>{key}:</strong> {String(value)}
                               </span>
                             ))}
+                          </div>
+                          <div className="bin-completion-stats">
+                            Completed bins: {focusBinCompletionStats.completed}/{focusBinCompletionStats.total}
                           </div>
                         </div>
                       )}
