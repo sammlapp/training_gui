@@ -44,6 +44,7 @@ function ReviewTab({ drawerOpen = false }) {
   const shouldAutoplayNextClip = useRef(false); // Flag to trigger autoplay after annotation
   const [gridModeAutoplay, setGridModeAutoplay] = useState(false); // Auto-play in grid mode when active clip advances
   const [isLeftTrayOpen, setIsLeftTrayOpen] = useState(false);
+  const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
   const [isShortcutsHelpOpen, setIsShortcutsHelpOpen] = useState(false);
   const [filters, setFilters] = useState({
     annotation: { enabled: false, values: [] },
@@ -442,6 +443,8 @@ function ReviewTab({ drawerOpen = false }) {
       setHasUnsavedChanges(false);
       // Clear loaded page data so it will load fresh
       setLoadedPageData([]);
+      // Clear filters when new file is loaded
+      clearFilters();
       // Clear save path when new annotation file is loaded
       setCurrentSavePath(null);
       localStorage.removeItem('review_autosave_location');
@@ -528,6 +531,8 @@ function ReviewTab({ drawerOpen = false }) {
         setHasUnsavedChanges(false);
         // Clear loaded page data so it will load fresh
         setLoadedPageData([]);
+        // Clear filters when new file is loaded
+        clearFilters();
         // Clear save path when new annotation file is loaded
         setCurrentSavePath(null);
         localStorage.removeItem('review_autosave_location');
@@ -1502,7 +1507,7 @@ function ReviewTab({ drawerOpen = false }) {
       >
         <div className="drawer-header">
           <h3 style={{ margin: 0, fontFamily: 'Rokkitt, sans-serif', fontSize: '1.1rem', fontWeight: 600 }}>
-            Load & Filter
+            Load Annotation Task
           </h3>
           <IconButton
             onClick={() => setIsLeftTrayOpen(false)}
@@ -1576,132 +1581,6 @@ function ReviewTab({ drawerOpen = false }) {
             )}
 
           </div>
-
-          {/* Filtering Section */}
-          {annotationData.length > 0 && (
-            <div className="tray-section">
-              <h4>Filter Clips</h4>
-
-              {/* Binary mode: Filter by annotation */}
-              {settings.review_mode === 'binary' && (
-                <div className="filter-group">
-                  <label className="filter-checkbox">
-                    <input
-                      type="checkbox"
-                      checked={filters.annotation.enabled}
-                      onChange={(e) => handleFilterChange('annotation', e.target.checked, filters.annotation.values)}
-                    />
-                    Filter by annotation
-                  </label>
-                  {filters.annotation.enabled && (
-                    <select
-                      multiple
-                      value={filters.annotation.values}
-                      onChange={(e) => {
-                        const values = Array.from(e.target.selectedOptions, option => option.value);
-                        handleFilterChange('annotation', true, values);
-                      }}
-                      className="filter-multiselect"
-                    >
-                      {getFilterOptions.annotation.map(option => (
-                        <option key={option} value={option}>
-                          {option === '' ? 'unlabeled' : option}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </div>
-              )}
-
-              {/* Multi-class mode: Filter by labels and status */}
-              {settings.review_mode === 'multiclass' && (
-                <>
-                  <div className="filter-group">
-                    <label className="filter-checkbox">
-                      <input
-                        type="checkbox"
-                        checked={filters.labels.enabled}
-                        onChange={(e) => handleFilterChange('labels', e.target.checked, filters.labels.values)}
-                      />
-                      Filter by labels
-                    </label>
-                    {filters.labels.enabled && (
-                      <select
-                        multiple
-                        value={filters.labels.values}
-                        onChange={(e) => {
-                          const values = Array.from(e.target.selectedOptions, option => option.value);
-                          handleFilterChange('labels', true, values);
-                        }}
-                        className="filter-multiselect"
-                      >
-                        {getFilterOptions.labels.map(option => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
-                      </select>
-                    )}
-                  </div>
-
-                  <div className="filter-group">
-                    <label className="filter-checkbox">
-                      <input
-                        type="checkbox"
-                        checked={filters.annotation_status.enabled}
-                        onChange={(e) => handleFilterChange('annotation_status', e.target.checked, filters.annotation_status.values)}
-                      />
-                      Filter by status
-                    </label>
-                    {filters.annotation_status.enabled && (
-                      <select
-                        multiple
-                        value={filters.annotation_status.values}
-                        onChange={(e) => {
-                          const values = Array.from(e.target.selectedOptions, option => option.value);
-                          handleFilterChange('annotation_status', true, values);
-                        }}
-                        className="filter-multiselect"
-                      >
-                        {getFilterOptions.annotation_status.map(option => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
-                      </select>
-                    )}
-                  </div>
-                </>
-              )}
-
-              {/* Filter Actions */}
-              <div className="filter-actions">
-                <button
-                  onClick={applyFilters}
-                  className="apply-filters-button"
-                  disabled={!hasUnappliedFilterChanges}
-                >
-                  Apply Filters
-                </button>
-                <button
-                  onClick={clearFilters}
-                  className="clear-filters-button"
-                >
-                  Clear All
-                </button>
-              </div>
-
-              {/* Show filter status */}
-              <div className="filter-status">
-                <small>
-                  Showing {filteredAnnotationData.length} of {annotationData.length} clips
-                  {hasUnappliedFilterChanges && (
-                    <span className="filter-pending"> (pending changes)</span>
-                  )}
-                </small>
-              </div>
-            </div>
-          )}
 
           {/* File Input (hidden) */}
           <input
@@ -1913,6 +1792,161 @@ function ReviewTab({ drawerOpen = false }) {
         </Box>
       </Modal>
 
+      {/* Filter Panel Drawer */}
+      <Drawer
+        anchor="right"
+        open={isFilterPanelOpen}
+        onClose={() => setIsFilterPanelOpen(false)}
+        variant="temporary"
+        sx={{
+          '& .MuiDrawer-paper': {
+            width: 400,
+            boxSizing: 'border-box',
+            backgroundColor: '#ffffff',
+            fontFamily: 'Rokkitt, sans-serif',
+          },
+        }}
+      >
+        <div className="drawer-header">
+          <h3 style={{ margin: 0, fontFamily: 'Rokkitt, sans-serif', fontSize: '1.1rem', fontWeight: 600 }}>
+            Filter Clips
+          </h3>
+          <IconButton
+            onClick={() => setIsFilterPanelOpen(false)}
+            sx={{
+              color: '#6b7280',
+              '&:hover': { backgroundColor: '#f3f4f6' }
+            }}
+          >
+            <CloseIcon />
+          </IconButton>
+        </div>
+        <div className="drawer-content">
+          {annotationData.length > 0 && (
+            <div className="tray-section">
+              {/* Binary mode: Filter by annotation */}
+              {settings.review_mode === 'binary' && (
+                <div className="filter-group">
+                  <label className="filter-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={filters.annotation.enabled}
+                      onChange={(e) => handleFilterChange('annotation', e.target.checked, filters.annotation.values)}
+                    />
+                    Filter by annotation
+                  </label>
+                  {filters.annotation.enabled && (
+                    <select
+                      multiple
+                      value={filters.annotation.values}
+                      onChange={(e) => {
+                        const values = Array.from(e.target.selectedOptions, option => option.value);
+                        handleFilterChange('annotation', true, values);
+                      }}
+                      className="filter-multiselect"
+                    >
+                      {getFilterOptions.annotation.map(option => (
+                        <option key={option} value={option}>
+                          {option === '' ? 'unlabeled' : option}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              )}
+
+              {/* Multi-class mode: Filter by labels and status */}
+              {settings.review_mode === 'multiclass' && (
+                <>
+                  <div className="filter-group">
+                    <label className="filter-checkbox">
+                      <input
+                        type="checkbox"
+                        checked={filters.labels.enabled}
+                        onChange={(e) => handleFilterChange('labels', e.target.checked, filters.labels.values)}
+                      />
+                      Filter by labels
+                    </label>
+                    {filters.labels.enabled && (
+                      <select
+                        multiple
+                        value={filters.labels.values}
+                        onChange={(e) => {
+                          const values = Array.from(e.target.selectedOptions, option => option.value);
+                          handleFilterChange('labels', true, values);
+                        }}
+                        className="filter-multiselect"
+                      >
+                        {getFilterOptions.labels.map(option => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+
+                  <div className="filter-group">
+                    <label className="filter-checkbox">
+                      <input
+                        type="checkbox"
+                        checked={filters.annotation_status.enabled}
+                        onChange={(e) => handleFilterChange('annotation_status', e.target.checked, filters.annotation_status.values)}
+                      />
+                      Filter by status
+                    </label>
+                    {filters.annotation_status.enabled && (
+                      <select
+                        multiple
+                        value={filters.annotation_status.values}
+                        onChange={(e) => {
+                          const values = Array.from(e.target.selectedOptions, option => option.value);
+                          handleFilterChange('annotation_status', true, values);
+                        }}
+                        className="filter-multiselect"
+                      >
+                        {getFilterOptions.annotation_status.map(option => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                </>
+              )}
+
+              {/* Filter Actions */}
+              <div className="filter-actions">
+                <button
+                  onClick={applyFilters}
+                  className="apply-filters-button"
+                  disabled={!hasUnappliedFilterChanges}
+                >
+                  Apply Filters
+                </button>
+                <button
+                  onClick={clearFilters}
+                  className="clear-filters-button"
+                >
+                  Clear All
+                </button>
+              </div>
+
+              {/* Show filter status */}
+              <div className="filter-status">
+                <small>
+                  Showing {filteredAnnotationData.length} of {annotationData.length} clips
+                  {hasUnappliedFilterChanges && (
+                    <span className="filter-pending"> (pending changes)</span>
+                  )}
+                </small>
+              </div>
+            </div>
+          )}
+        </div>
+      </Drawer>
+
       {/* Main Content Area - Full Window */}
       <div className="review-main-content">
         {/* Compact Top Toolbar */}
@@ -1928,7 +1962,7 @@ function ReviewTab({ drawerOpen = false }) {
             <button
               onClick={() => setIsLeftTrayOpen(true)}
               className="toolbar-btn"
-              title="Load & Filter"
+              title="Load Annotation Task"
             >
               <span className="material-symbols-outlined">menu</span>
             </button>
@@ -1964,7 +1998,6 @@ function ReviewTab({ drawerOpen = false }) {
             </button>
 
             {/* Auto-save controls */}
-
             <button
               onClick={() => setAutoSaveEnabled(!autoSaveEnabled)}
               className={`toolbar-btn ${autoSaveEnabled ? 'active' : ''}`}
@@ -1974,6 +2007,16 @@ function ReviewTab({ drawerOpen = false }) {
               <span className="material-symbols-outlined">
                 {autoSaveEnabled ? 'sync' : 'sync_disabled'}
               </span>
+            </button>
+
+            {/* Filter button */}
+            <button
+              onClick={() => setIsFilterPanelOpen(true)}
+              className={`toolbar-btn ${(filters.annotation.enabled || filters.labels.enabled || filters.annotation_status.enabled) ? 'active' : ''}`}
+              title="Filter Clips"
+              disabled={annotationData.length === 0}
+            >
+              <span className="material-symbols-outlined">filter_alt</span>
             </button>
 
             {/* Save Status Indicator */}
