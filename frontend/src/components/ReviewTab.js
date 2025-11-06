@@ -31,7 +31,7 @@ function ReviewTab({ drawerOpen = false }) {
   const [availableClasses, setAvailableClasses] = useState([]);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [loadedPageData, setLoadedPageData] = useState([]);
-  const [displayedPageData, setDisplayedPageData] = useState([]); // What's currently shown - only updates when new page is ready
+  const [lastRenderedPage, setLastRenderedPage] = useState(0); // Track which page we last rendered to prevent flashing
   const [isPageTransitioning, setIsPageTransitioning] = useState(false);
   const [isSettingsPanelOpen, setIsSettingsPanelOpen] = useState(false);
   const [rootAudioPath, setRootAudioPath] = useState('');
@@ -148,6 +148,13 @@ function ReviewTab({ drawerOpen = false }) {
     return filteredAnnotationData.slice(start, end);
   }, [currentPage, itemsPerPage, filteredAnnotationData]);
 
+  // Get data for the last rendered page (to show old page while new one loads)
+  const lastRenderedPageData = useMemo(() => {
+    const start = lastRenderedPage * itemsPerPage;
+    const end = start + itemsPerPage;
+    return filteredAnnotationData.slice(start, end);
+  }, [lastRenderedPage, itemsPerPage, filteredAnnotationData]);
+
   // Load spectrograms for current page
   const loadCurrentPageSpectrograms = useCallback(async () => {
     const currentData = getCurrentPageData();
@@ -249,10 +256,9 @@ function ReviewTab({ drawerOpen = false }) {
           console.warn('Some clips failed to generate spectrograms:', failedClips);
         }
 
-        // Update both loaded data and displayed page data atomically
-        // This ensures the display only updates once everything is ready
+        // Update loaded data and mark that we've rendered this page
         setLoadedPageData(loadedClips);
-        setDisplayedPageData(currentData); // Now safe to display these clips
+        setLastRenderedPage(currentPage); // Safe to display this page now
       } catch (error) {
         console.error('Failed to load page spectrograms:', error);
         console.error('Error details:', {
@@ -386,9 +392,9 @@ function ReviewTab({ drawerOpen = false }) {
       setAnnotationData(data);
       extractAvailableClasses(data);
       setCurrentPage(0);
+      setLastRenderedPage(0); // Reset to page 0
       setHasUnsavedChanges(false);
-      // Clear displayed page data so it will load fresh
-      setDisplayedPageData([]);
+      // Clear loaded page data so it will load fresh
       setLoadedPageData([]);
       // Clear save path when new annotation file is loaded
       setCurrentSavePath(null);
@@ -470,9 +476,9 @@ function ReviewTab({ drawerOpen = false }) {
 
         extractAvailableClasses(data.clips);
         setCurrentPage(0);
+        setLastRenderedPage(0); // Reset to page 0
         setHasUnsavedChanges(false);
-        // Clear displayed page data so it will load fresh
-        setDisplayedPageData([]);
+        // Clear loaded page data so it will load fresh
         setLoadedPageData([]);
         // Clear save path when new annotation file is loaded
         setCurrentSavePath(null);
@@ -749,8 +755,7 @@ function ReviewTab({ drawerOpen = false }) {
   const applyFilters = useCallback(() => {
     setAppliedFilters(filters);
     setCurrentPage(0); // Reset to first page when filters are applied
-    // Clear displayed data so new filtered content will load fresh
-    setDisplayedPageData([]);
+    setLastRenderedPage(0); // Reset rendered page tracker
   }, [filters]);
 
   // Clear filters function
@@ -763,8 +768,7 @@ function ReviewTab({ drawerOpen = false }) {
     setFilters(emptyFilters);
     setAppliedFilters(emptyFilters);
     setCurrentPage(0);
-    // Clear displayed data so unfiltered content will load fresh
-    setDisplayedPageData([]);
+    setLastRenderedPage(0); // Reset rendered page tracker
   }, []);
 
   // Check if filters have changed since last apply
@@ -1241,10 +1245,16 @@ function ReviewTab({ drawerOpen = false }) {
 
 
   const renderAnnotationGrid = useMemo(() => {
-    // Use displayedPageData instead of currentPageData to prevent showing unloaded content
-    const currentData = displayedPageData.length > 0 ? displayedPageData : currentPageData;
+    // Determine which page data to show
+    // If we've moved to a new page but spectrograms haven't loaded, show the old page
+    const isOnNewPage = currentPage !== lastRenderedPage;
+    const hasLoadedNewPage = loadedPageData.length > 0 &&
+      loadedPageData.some(loaded => currentPageData.some(clip => clip.id === loaded.clip_id));
 
-    if (currentData.length === 0) {
+    // Show old page if we're on a new page but it hasn't loaded yet, otherwise show current
+    const dataToShow = (isOnNewPage && !hasLoadedNewPage) ? lastRenderedPageData : currentPageData;
+
+    if (dataToShow.length === 0) {
       return (
         <div className="no-data-message">
           <p>No clips to display on this page.</p>
@@ -1258,7 +1268,7 @@ function ReviewTab({ drawerOpen = false }) {
     return (
       <div className="annotation-grid-container" style={{ position: 'relative' }}>
         <div className={getGridClassName()}>
-          {currentData.map(clip => {
+          {dataToShow.map(clip => {
             // Find the loaded data for this clip
             const loadedClip = loadedPageData.find(loaded => loaded.clip_id === clip.id) || clip;
 
@@ -1300,7 +1310,7 @@ function ReviewTab({ drawerOpen = false }) {
         )} */}
       </div>
     );
-  }, [displayedPageData, currentPageData, loadedPageData, httpLoader.isLoading, isPageTransitioning, httpLoader.progress, getGridClassName, settings.review_mode, availableClasses, settings.show_comments, settings.show_file_name, handleAnnotationChange, handleCommentChange]);
+  }, [currentPage, lastRenderedPage, currentPageData, lastRenderedPageData, loadedPageData, httpLoader.isLoading, isPageTransitioning, httpLoader.progress, getGridClassName, settings.review_mode, availableClasses, settings.show_comments, settings.show_file_name, handleAnnotationChange, handleCommentChange]);
 
   return (
     <div className="review-tab-layout">
