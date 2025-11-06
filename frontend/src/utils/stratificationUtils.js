@@ -175,7 +175,22 @@ export function isBinComplete(clips, reviewMode, completionConfig) {
       const matchingCount = clips.filter(clip => {
         if (clip.annotation_status !== 'complete') return false;
 
-        const clipLabels = clip.labels ? clip.labels.split(',').map(l => l.trim()) : [];
+        // Parse labels - could be JSON string, comma-separated string, or array
+        let clipLabels = [];
+        if (clip.labels) {
+          if (typeof clip.labels === 'string') {
+            // Try parsing as JSON first
+            try {
+              clipLabels = JSON.parse(clip.labels);
+            } catch {
+              // Fall back to comma-separated
+              clipLabels = clip.labels.split(',').map(l => l.trim());
+            }
+          } else if (Array.isArray(clip.labels)) {
+            clipLabels = clip.labels;
+          }
+        }
+
         return targetLabels.some(target => clipLabels.includes(target));
       }).length;
 
