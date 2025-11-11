@@ -1753,13 +1753,13 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
     return csvContent;
   };
 
-  const getGridClassName = useCallback(() => {
+  const getGridDimensions = useCallback(() => {
     // In classifier-guided mode, use dynamic rows based on clips in bin
     if (classifierGuidedMode.enabled && currentPageData.length > 0) {
       const rows = Math.ceil(currentPageData.length / settings.grid_columns);
-      return `annotation-grid grid-${rows}x${settings.grid_columns}`;
+      return { rows, columns: settings.grid_columns };
     }
-    return `annotation-grid grid-${settings.grid_rows}x${settings.grid_columns}`;
+    return { rows: settings.grid_rows, columns: settings.grid_columns };
   }, [settings.grid_rows, settings.grid_columns, classifierGuidedMode.enabled, currentPageData.length]);
 
 
@@ -1850,7 +1850,13 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
         )}
 
       <div className="annotation-grid-container" style={{ position: 'relative' }}>
-        <div className={getGridClassName()}>
+        <div
+          className="annotation-grid"
+          style={{
+            '--rows': getGridDimensions().rows,
+            '--cols': getGridDimensions().columns,
+          }}
+        >
           {dataToShow.map((clip, indexOnPage) => {
             // Find the loaded data for this clip
             const loadedClip = loadedPageData.find(loaded => loaded.clip_id === clip.id) || clip;
@@ -1909,7 +1915,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
       </div>
       </>
     );
-  }, [currentPage, lastRenderedPage, currentBinIndex, lastRenderedBinIndex, currentPageData, lastRenderedPageData, loadedPageData, activeClipIndexOnPage, httpLoader.isLoading, isPageTransitioning, httpLoader.progress, getGridClassName, settings.review_mode, availableClasses, settings.show_comments, settings.show_file_name, settings.show_binary_controls, handleAnnotationChange, handleCommentChange, classifierGuidedMode, stratifiedBins]);
+  }, [currentPage, lastRenderedPage, currentBinIndex, lastRenderedBinIndex, currentPageData, lastRenderedPageData, loadedPageData, activeClipIndexOnPage, httpLoader.isLoading, isPageTransitioning, httpLoader.progress, getGridDimensions, settings.review_mode, availableClasses, settings.show_comments, settings.show_file_name, settings.show_binary_controls, handleAnnotationChange, handleCommentChange, classifierGuidedMode, stratifiedBins]);
 
   return (
     <div className="review-tab-layout">

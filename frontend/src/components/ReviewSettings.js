@@ -365,7 +365,7 @@ function ReviewSettings({ onSettingsChange, onReRenderSpectrograms, onClearCache
                     value={settings.grid_rows}
                     onChange={(e) => handleSettingChange('grid_rows', parseInt(e.target.value))}
                   >
-                    {[1, 2, 3, 4, 5, 6].map(num => (
+                    {[1, 2, 3, 4, 5, 6,7,8,9,10].map(num => (
                       <option key={num} value={num}>{num}</option>
                     ))}
                   </select>
@@ -377,7 +377,7 @@ function ReviewSettings({ onSettingsChange, onReRenderSpectrograms, onClearCache
                     value={settings.grid_columns}
                     onChange={(e) => handleSettingChange('grid_columns', parseInt(e.target.value))}
                   >
-                    {[1, 2, 3, 4, 5, 6].map(num => (
+                    {[1, 2, 3, 4, 5, 6,7,8,9,10].map(num => (
                       <option key={num} value={num}>{num}</option>
                     ))}
                   </select>
