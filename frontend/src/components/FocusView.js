@@ -307,7 +307,12 @@ function FocusView({
           onNavigate('previous');
           break;
         case 'k':
-          onNavigate('next');
+          // make sure not cmd+shift+k, which has special function
+          // in CGL mode (move to next incomplete clip)
+          if (!(event.metaKey && event.shiftKey)) {
+            onNavigate('next');
+          }
+          // onNavigate('next');
           break;
         case ' ':
           togglePlayPause();
