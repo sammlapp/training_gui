@@ -14,6 +14,49 @@ The app will be built for desktop guis on Mac, Linux, and Windows. Python enviro
 
 streamlit_inference.py is provided as a reference for understanding and porting basic functionality, but not as a final product. 
 
+## TODOs for NiceGUI version
+
+Inference:
+- implement embed to hoplite db
+- native file system integration when not in browser mode? 
+- fix default python environment set up / usage
+- add progress monitoring to task pane; the inference output log's last line has a percentage from tqdm
+- improve config load/save: currently doesn't allow user to specify a file
+
+Inference Tab:
+- completed/failed/canceled/unstarted tasks should display in the tasks panel, not just running tasks (color code these)
+- the "create task" button should create a task in the task pane with a button to Start the task
+- completed tasks should show the job_folder in their task pane panel
+- if Save sparse outputs is not checked, the config should have sparse_threshold:none so that the inference script knows not to use the sparse thresholding approach
+
+Review Tab:
+- in multiclass mode, need to be able to modify the class list (return-delimited text field)
+- settings panel displays at bottom of page when in grid mode. Should always display on the right side, extends over top of the grid layout 
+- bug in display layout: sometimes an audio clip panel renders as full width instead of within the grid layout
+- implement keyboard shortcuts: 
+    focus mode: ASDF yes/no/uncertain/unlabeled, J/K prev/next clip, spacebar play/pause, ESC to switch to grid mode
+    grid mode: P/N previous/next page, ESC to switch to Focus mode, Shift+A/S/D/F annotate all on page
+- in settings, add checkbox for auto-play in focus mode and implement this functionality
+- in focus mode, if in binary annotation mode: when an annotation is selected, automatically advance to next clip
+- in focus mode, comments are not saving/persisting after switching clips and coming back 
+- something breaks when I use the settings panel to change the number of columns in the grid audio clip layout. No clips display after this. 
+
+
+- button groups for yes/no/uncertain/unlabeled, with appropriate colors. Example:
+
+with ui.button_group().props('outline'):
+    ui.button('Yes', color='green').props('push')
+    ui.button('No', color='red').props('push')
+    ui.button('Uncertain', color='yellow').props('push')
+    ui.button('Unlabeled', color='grey').props('push')
+
+But the active label should have a solid color background to indicate which label is currently selected
+
+App layout
+- move tab navigation to a narrow left bar with icons
+
+
+
 ## minimal changes:
 allow tasks to run on parallel if user clicks run in parallel
 
@@ -24,52 +67,6 @@ allow tasks to run on parallel if user clicks run in parallel
 - the environment built with conda pack works. I can run /path/to/env/bin/python backend/scripts/predict.py --config /path/to/config.txt. It runs inference and creates the csv. 
 
 # Visual design
-
-For theming, let's switch to using Material UI components, icons, and theming throughout
-Installation: (I ran this myself)
-npm install @mui/material @emotion/react @emotion/styled
-
-Start by taking a close look at this Material UI "Dashboard" example project:
-https://github.com/mui/material-ui/tree/v7.2.0/docs/data/material/getting-started/templates/dashboard 
-Usage instructions (if we were using the example template):
-- Copy these folders (dashboard and shared-theme) into your project, or one of the example projects.
-- Make sure your project has the required dependencies: @mui/material, @mui/icons-material, @emotion/styled, @emotion/react, @mui/x-charts, @mui/x-date-pickers, @mui/x-data-grid, @mui/x-tree-view, dayjs
-- Import and use the Dashboard component.
-- 
-
-(we will eventually use date pickers and charts)
-
-Use default light color theme, for now. Use the icons from material-ui throughout.  
-
-For fonts let's switch to Monserrat, via FontSource
-
-I already ran npm install @fontsource-variable/montserrat
-
-We can import it in the entry point like this:
-import '@fontsource/monserrat/300.css';
-import '@fontsource/monserrat/400.css';
-import '@fontsource/monserrat/500.css';
-import '@fontsource/monserrat/700.css';
-
-Review tab visuals:
-- dB range slider still has poor appearance. use the react material-ui range slider
-- also throughout, switch to using the AutoComplete element from material-ui for multi-selects . example:
-<Autocomplete
-        multiple
-        id="tags-outlined"
-        options={speciesList}
-        getOptionLabel={(option) => option.title}
-        defaultValue={[speciesList]}
-        renderInput={(params) => (
-          <TextField
-            {...params}
-            label="select species"
-            placeholder="Selected labels"
-          />
-        )}
-      />
-(including the multi-selects for filtering by labels in Review tab)
-
 
 
 

@@ -329,7 +329,7 @@ def main():
         logger.info("Loading and initializing model from configuration")
         model = load_model(config_data, logger)
 
-        logger.info(f"Output directory: {config_data.get('output_dir')}")
+        logger.info(f"Saving outputs to: {config_data.get('job_folder')}")
 
         # missing_files = [f for f in files if not os.path.exists(f)]
         # if missing_files:
@@ -345,7 +345,7 @@ def main():
 
         # Run on a small subset of data if specified
         if "subset_size" in config_data and config_data["subset_size"] is not None:
-            subset_size = min(config_data["subset_size"], len(files))
+            subset_size = int(min(config_data["subset_size"], len(files)))
             logger.info(f"Using a SUBSET of {subset_size} files as a test run")
             files = np.random.choice(files, size=subset_size, replace=False).tolist()
         else:
