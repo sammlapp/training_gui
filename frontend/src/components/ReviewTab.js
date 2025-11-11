@@ -619,6 +619,10 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
     setLoading(true);
     setError('');
 
+    // Clear old data immediately to prevent loading spectrograms with mismatched data
+    setAnnotationData([]);
+    setLoadedPageData([]);
+
     try {
       const text = await file.text();
       const data = parseAnnotationCSV(text);
@@ -652,6 +656,10 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
   const loadAndProcessCSV = async (filePath) => {
     setLoading(true);
     setError('');
+
+    // Clear old data immediately to prevent loading spectrograms with mismatched data
+    setAnnotationData([]);
+    setLoadedPageData([]);
 
     try {
       // Always set root audio path to directory containing the CSV file
@@ -1999,7 +2007,23 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
 
             {error && (
               <div className="error-message">
-                {error}
+                <span style={{ flex: 1 }}>{error}</span>
+                <button
+                  onClick={() => setError('')}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'inherit',
+                    cursor: 'pointer',
+                    padding: '0 0 0 8px',
+                    fontSize: '1.2rem',
+                    lineHeight: 1,
+                    flexShrink: 0
+                  }}
+                  title="Dismiss error"
+                >
+                  ×
+                </button>
               </div>
             )}
 
@@ -2704,7 +2728,23 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
         {/* Error and status messages */}
         {error && (
           <div className="error-message">
-            {error}
+            <span style={{ flex: 1 }}>{error}</span>
+            <button
+              onClick={() => setError('')}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: 'inherit',
+                cursor: 'pointer',
+                padding: '0 0 0 8px',
+                fontSize: '1.2rem',
+                lineHeight: 1,
+                flexShrink: 0
+              }}
+              title="Dismiss error"
+            >
+              ×
+            </button>
           </div>
         )}
 

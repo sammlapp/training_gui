@@ -90,7 +90,14 @@ def load_extraction_csv(csv_path, threshold=0):
 
         if "annotation" in df.columns and "labels" in df.columns:
             raise ValueError(
-                "Found columns for both 'annotations' (yes/no/uncertain) and 'labels' (lists of classes present) which could lead to mass confusion and is not allowed. "
+                """Found columns for both 'annotations' (yes/no/uncertain) and
+                'labels' (lists of classes present) which could lead to mass
+                confusion and is not allowed. Consider creating a version of the
+                annotation file in which only one of these columns is present.
+                If you are performing single-class annotation, retain the
+                'annotation' column and delete the 'labels' column. If you are
+                performing multi-class annotation, retain the 'labels'
+                column and remove the 'annotation' column."""
             )
 
         if "annotation" in df.columns:
@@ -113,7 +120,9 @@ def load_extraction_csv(csv_path, threshold=0):
             standard_cols.extend(["annotation", "comments"])
 
             # Get all extra columns (metadata like card, date, grid, scores, etc.)
-            extra_cols = [col for col in df.columns if col not in standard_cols and col != "id"]
+            extra_cols = [
+                col for col in df.columns if col not in standard_cols and col != "id"
+            ]
 
             # Reorder: standard columns first, then extra columns, then id
             df = df[standard_cols + extra_cols + ["id"]]
@@ -177,7 +186,9 @@ def load_extraction_csv(csv_path, threshold=0):
             standard_cols.extend(["labels", "annotation_status", "comments"])
 
             # Get all extra columns (metadata like card, date, grid, scores, etc.)
-            extra_cols = [col for col in df.columns if col not in standard_cols and col != "id"]
+            extra_cols = [
+                col for col in df.columns if col not in standard_cols and col != "id"
+            ]
 
             # Reorder: standard columns first, then extra columns, then id
             df = df[standard_cols + extra_cols + ["id"]]
@@ -214,7 +225,11 @@ def load_extraction_csv(csv_path, threshold=0):
 
             # Get all extra columns (metadata) - exclude class columns and id
             # Class columns were already processed into labels
-            extra_cols = [col for col in df.columns if col not in standard_cols and col not in classes and col != "id"]
+            extra_cols = [
+                col
+                for col in df.columns
+                if col not in standard_cols and col not in classes and col != "id"
+            ]
 
             # Reorder: standard columns first, then extra columns, then id
             df = df[standard_cols + extra_cols + ["id"]]
