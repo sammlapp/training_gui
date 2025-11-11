@@ -2419,13 +2419,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
       {/* Main Content Area - Full Window */}
       <div className="review-main-content">
         {/* Compact Top Toolbar */}
-        <div
-          className="review-toolbar"
-          style={{
-            left: isReviewOnly ? 0 : (drawerOpen ? '240px' : 'calc(64px + 1px)'),
-            width: isReviewOnly ? '100%' : (drawerOpen ? 'calc(100% - 240px)' : 'calc(100% - 65px)')
-          }}
-        >
+        <div className="review-toolbar">
           <div className="toolbar-left">
             {/* Left Tray Toggle */}
             <button
