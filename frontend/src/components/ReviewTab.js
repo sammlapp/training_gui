@@ -385,10 +385,10 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
     }
   }, [currentPage, currentBinIndex, currentDataVersion, rootAudioPath, filteredAnnotationData.length, settings.grid_rows, settings.grid_columns, classifierGuidedMode.enabled]);
 
-  // Reset active clip to first clip when page changes
+  // Reset active clip to first clip when page or bin changes
   useEffect(() => {
     setActiveClipIndexOnPage(0);
-  }, [currentPage]);
+  }, [currentPage, currentBinIndex]);
 
   // Sync focus clip index with active clip when entering focus mode
   useEffect(() => {
