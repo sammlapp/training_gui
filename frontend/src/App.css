@@ -3310,12 +3310,12 @@ button:disabled {
 
 .segmented-key {
   font-size: 0.8rem;
-  opacity: 0.7;
-  font-weight: 400;
+  /* opacity: 0.7; */
+  font-weight: 700;
 }
 
 .segmented-label {
-  font-weight: 200;
+  font-weight: 700;
 }
 
 .focus-annotation-button {
@@ -3594,12 +3594,12 @@ button:disabled {
 .focus-controls-compact {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.5rem;
   width: 100%;
   max-width: none;
   /* Use full width available */
   margin: 0;
-  padding: 1rem;
+  padding: .5rem;
 }
 
 .focus-info-row {
@@ -3882,7 +3882,7 @@ button:disabled {
   gap: 1rem;
   align-items: flex-start;
   margin-bottom: 0.5rem;
-  padding: 1rem;
+  padding: .5rem;
   background-color: var(--light-bg);
   border-radius: 8px;
   border: 1px solid var(--border);
@@ -5306,19 +5306,20 @@ button:disabled {
   flex: 1;
   padding: 8px 12px;
   background: var(--white);
-  border: none;
+  border: 1px solid var(--border);
   font-size: 0.8rem;
   cursor: pointer;
   transition: all 0.2s;
-  border-right: 1px solid var(--border);
+  /* border-right: 1px solid var(--border); */
 }
 
-.segment:last-child {
+/* .segment:last-child {
   border-right: none;
-}
+} */
 
 .segment:hover {
   background: var(--light-gray);
+  transform: none;
 }
 
 .segment.active {
@@ -5328,6 +5329,7 @@ button:disabled {
 
 .segment.active:hover {
   background: var(--dark);
+  transform: none;
 }
 
 /* File Selection Content */

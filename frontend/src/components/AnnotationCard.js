@@ -432,7 +432,8 @@ const AnnotationCard = memo(function AnnotationCard({
                   style={{
                     backgroundColor: isActive ? option.color : 'transparent',
                     borderColor: option.color,
-                    color: isActive ? 'white' : option.color
+                    color: isActive ? 'white' : option.color,
+                    border: 'none'
                   }}
                   onClick={() => handleBinaryAnnotationChange(option.value)}
                   title={option.label}

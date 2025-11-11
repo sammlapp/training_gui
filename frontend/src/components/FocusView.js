@@ -406,7 +406,9 @@ function FocusView({
                     style={{
                       backgroundColor: ((option.value === 'unlabeled' && annotationValue === null) ||
                         (option.value !== 'unlabeled' && annotationValue === option.value)) ? option.color : 'transparent',
-                      borderColor: option.color,
+                      border: "none",
+                      borderRadius: "10px",
+                      fontSize: '1rem',
                       color: ((option.value === 'unlabeled' && annotationValue === null) ||
                         (option.value !== 'unlabeled' && annotationValue === option.value)) ? 'white' : option.color
                     }}
