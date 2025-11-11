@@ -18,12 +18,22 @@
     "electron:pack": "npm run build:all && electron-builder --dir",
     "dist": "npm run build:all && electron-builder",
     "dist:mac": "npm run build:all && electron-builder --mac",
+    "dist:mac-arm64": "npm run build:all && electron-builder --mac --arm64",
+    "dist:mac-x64": "npm run build:all && electron-builder --mac --x64",
+    "dist:win": "npm run build:all && electron-builder --win",
+    "dist:linux": "npm run build:all && electron-builder --linux",
+    "dist:all": "npm run build:all && electron-builder --mac --win --linux",
     "build:review": "cross-env REACT_APP_REVIEW_ONLY=true react-scripts build",
     "build:review-all": "npm run build:review && npm run build:python-pyinstaller",
     "electron-dev-review": "concurrently \"cross-env BROWSER=none REACT_APP_REVIEW_ONLY=true npm start\" \"wait-on http://localhost:3000 && cross-env NODE_ENV=development electron src/main-review.js\"",
     "electron-dev-review-pyinstaller": "concurrently \"cross-env BROWSER=none REACT_APP_REVIEW_ONLY=true npm start\" \"./python-dist/lightweight_server --port 8000\" \"wait-on http://localhost:3000 && wait-on http://localhost:8000/health && cross-env NODE_ENV=development electron src/main-review.js\"",
     "dist:review": "npm run build:review-all && node scripts/build-review.js",
     "dist:review-mac": "npm run build:review-all && node scripts/build-review.js --mac",
+    "dist:review-mac-arm64": "npm run build:review-all && node scripts/build-review.js --mac --arm64",
+    "dist:review-mac-x64": "npm run build:review-all && node scripts/build-review.js --mac --x64",
+    "dist:review-win": "npm run build:review-all && node scripts/build-review.js --win",
+    "dist:review-linux": "npm run build:review-all && node scripts/build-review.js --linux",
+    "dist:review-all": "npm run build:review-all && node scripts/build-review.js --mac --win --linux",
     "postinstall": "electron-builder install-app-deps"
   },
   "dependencies": {
@@ -100,7 +110,8 @@
         {
           "target": "dmg",
           "arch": [
-            "arm64"
+            "arm64",
+            "x64"
           ]
         }
       ]
