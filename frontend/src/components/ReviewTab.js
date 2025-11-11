@@ -14,7 +14,7 @@ import {
   getNumericColumns
 } from '../utils/stratificationUtils';
 
-function ReviewTab({ drawerOpen = false }) {
+function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
   const [selectedFile, setSelectedFile] = useState('');
   const [annotationData, setAnnotationData] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -305,6 +305,23 @@ function ReviewTab({ drawerOpen = false }) {
         const failedClips = loadedClips.filter(clip => !clip.spectrogram_base64);
         if (failedClips.length > 0) {
           console.warn('Some clips failed to generate spectrograms:', failedClips);
+
+          // Show helpful error message for the first failed clip
+          if (failedClips.length > 0) {
+            const firstFailedClip = failedClips[0];
+            // Find the original clip data to get the CSV file path
+            const originalClip = currentData.find(c => c.id === firstFailedClip.clip_id);
+            if (originalClip) {
+              const expectedPath = clipsToLoad.find(c => c.clip_id === firstFailedClip.clip_id)?.file_path || 'unknown';
+              const csvPath = originalClip.file;
+              const errorMessage = `Audio file(s) were not found in the expected locations. ` +
+                `First missing file: ${expectedPath}\n` +
+                `Path in CSV file: ${csvPath}\n` +
+                `Root audio folder: ${rootAudioPath || '(not set)'}\n\n` +
+                `Use the menu in the upper left to specify the Root Audio Folder that should be prepended to values of the 'file' column in the annotation CSV.`;
+              setError(errorMessage);
+            }
+          }
         }
 
         // Update loaded data and mark that we've rendered this page/bin
@@ -621,21 +638,19 @@ function ReviewTab({ drawerOpen = false }) {
     setError('');
 
     try {
-      // Auto-set root audio path if not already set
+      // Always set root audio path to directory containing the CSV file
       const savedSettings = localStorage.getItem('review_settings');
       let currentSettings = settings;
       if (savedSettings) {
         currentSettings = JSON.parse(savedSettings);
       }
 
-      if (!rootAudioPath || rootAudioPath.trim() === '') {
-        // Set root audio path to directory containing the CSV file
-        const csvDirectory = filePath.substring(0, filePath.lastIndexOf('/'));
-        setRootAudioPath(csvDirectory);
-        // Save to localStorage (keeping it with settings for now but will move it out)
-        const newSettings = { ...currentSettings, root_audio_path: csvDirectory };
-        localStorage.setItem('review_settings', JSON.stringify(newSettings));
-      }
+      // Set root audio path to directory containing the CSV file
+      const csvDirectory = filePath.substring(0, filePath.lastIndexOf('/'));
+      setRootAudioPath(csvDirectory);
+      // Save to localStorage (keeping it with settings for now but will move it out)
+      const newSettings = { ...currentSettings, root_audio_path: csvDirectory };
+      localStorage.setItem('review_settings', JSON.stringify(newSettings));
 
       // Use Python script to read CSV file
       const processId = Date.now().toString();
@@ -2387,8 +2402,8 @@ function ReviewTab({ drawerOpen = false }) {
         <div
           className="review-toolbar"
           style={{
-            left: drawerOpen ? '240px' : 'calc(64px + 1px)',
-            width: drawerOpen ? 'calc(100% - 240px)' : 'calc(100% - 65px)'
+            left: isReviewOnly ? 0 : (drawerOpen ? '240px' : 'calc(64px + 1px)'),
+            width: isReviewOnly ? '100%' : (drawerOpen ? 'calc(100% - 240px)' : 'calc(100% - 65px)')
           }}
         >
           <div className="toolbar-left">

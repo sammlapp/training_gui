@@ -92,6 +92,33 @@ User will select an annotation task. The interface will be very similar to that 
 - implement a settings panel with spectrogram window length, frequency bandpass range, dB range, colormap, number of rows and columns for grid of displayed clips, show/hide comments field, show/hide file name
 
 
+### active clip functionality in grid view
+one clip is active at a time. 
+- the active clip is always one of the clips on the current page. If page changes, set first clip on page as active
+- The active clip has a thicker outline on the display panel
+- Binary classification mode: user can use a/s/d/f shortcuts to annotate the active clip; when a/s/d/f is clicked, "active" clip moves to the next clip; if last clip on page, transitions to next page and first clip on new page is active; user can navigate Active clip to previous/next clip on page with j/k
+- Multi-class classification mode: the multi select of the active clip is activated, so that the user can simply start typing labels.
+- active clip does not go beyond first/last index on the page (no advance from last clip on page, no backwards-move from first clip on page); 
+- when switching to focus mode, the clip that appears in the focus mode display is the clip that was "active" in grid mode
+- clicking on a panel (somewhere other than the spectrogram, comments box, or annotation controls) makes that clip active
+
+### Classifier-guided listening (CGL)
+
+We are going to introduce an option called "classifier-guided listening". When selected, the clips on a page in grid view are determined by stratification based on metadata columns in the annotation csv. For instance, the annotation csv could contain columns "location_id" and "primary_period". Then there will be one page of clips for each unique combination of "location_id" and "primary_period". The user selects the names of columns to use for stratification in a menu panel. The user can also select a column containing classifier score, in order to sort the displayed clips on the page from highest to lowest classifier score. There is also a menu option for the maximum number of clips to display per stratification bin, default 20. 
+Since the set of clips on a page is determined by the stratification bins, the "number of rows" menu option will be ignored when classifier-guided listening is enabled. The number of columns menu option is still used, and the grid contains as many rows as needed to display all clips in the stratification bin. 
+Importantly, the user can also specify rules for when to stop annotating within a bin (see below). When a bin is complete, the GUI auto-advances to the next page. 
+
+Here's what we need:
+- a module implementing the logic for finding unique combinations of the selected stratification columns and generating the sets of clips to be displayed on each page
+- a brand new panel in the GUI, accessed via a button called "classifier guided listening", with menu options for: (0) turning on/off classifier guided listening mode. (1) selecting columns of the loaded csv to use for stratification; (2) selecting a column to use as the classifier score, plus a toggle for displaying the clips in (a) original order (b) highest to lowest score (c) random order. 
+- "bin completion" logic: the user specifies a strategy to use for when the stratification bin is considered complete. The options are 
+
+(1) All: annotate all clips in bin
+
+(2) Binary: annotate until [select number] clips are labeled Yes; A bin is also 'complete' if all clips are labeled with any of yes/no/uncertain, even if the desired count of Yes has not been reached
+
+(3) Multi-class: annotate until the count of any of these labels: [multi-select labels] is: [select number]. Clips only count toward the total when they are marked 'complete'. A bin is also 'complete' if all clips are marked 'complete', even if the desired count has not been reached. 
+
 ## build strategy
 - implement saving and loading all inference settings, including paths, to a config file. The path to the config file will be the single argument taken by the inference.py script. 
 - we will use pyinstaller to build an executable for the backend scripts EXCLUDING ml and heavy dependencies (no predict, train embed). The scripts should only depend on pandas, matplotlib, numpy, librosa, etc. They will not require pytorch, opensoundscape, or bioacoustics-model-zoo
@@ -188,10 +215,7 @@ Test out the script on /Users/SML161/Downloads/HawkEars_Embedding_-_1_files_-_72
 
 ## general feature request list 
 
-improve paging display for review tab: should show previous specs then replace with new ones, rather than briefly showing the 'loading spectrograms' on a white page.
-
 get xeno-canto recordings for a species to supplement training data?!
-
 
 potentially allow parallel as well as sequential tasks
 
@@ -241,11 +265,45 @@ Hawkears not loading offline - HTTP error something to do with download-cached-f
 
 review tab "undo" functionality? I think this would require tracking the full-page or single-clip annotations in a history so that we can sequentially undo and redo changes witch ctrl/cmd+z and ctrl/cmd+y
 
-toolbar in review tab: if too wide for current window, should float the tools onto another line like line-wrapping in a textbox. 
-
-
 ## HAWKEARS Low band is broken in v0.12.0: 
 need to update BMZ version then update dependency
+
+## review tab
+- settings checkbox to show/hide the yes/no/uncertain/unlabeled segmented control for each clip panel in grid mode + binary classification: default is checked; when un-checked user can still annotate via keyboard controls and active clip navigation but the panel is compact with no segmented control shown
+- don't like the visual aesthetic of the segmented controls. Let's try something different while retaining the per-button coloring and functionality
+- add settings option for whether to auto-advance after an annotation in Focus mode
+- "status bar" is being covered by the global app status bar in App.js instead of integrating with it. 
+- show reference frequency line: this is not doing anything
+- in Build version, changing the spectrogram color map breaks something
+
+### ✅ Review-only App
+within this project, create a separate deployable/buildable version of the app that only includes the Review tab. In this version of the app, we can remove page navigation as there will only be one page. We should be able to build this app as a desktop executable that includes the lightweight compiled python environment.
+
+- the offset of main content vs top menu bar isn't working correctly. When the window is narrow the menu bar will wrap around and become larger. The main content should simply always be below the menu bar. It seems like there should be a simpler way to do this than trying to calculate the expected height of the menu bar. 
+
+**COMPLETED**: Created review-only version of Dipper
+- Modified App.js to conditionally render based on `REACT_APP_REVIEW_ONLY` environment variable
+- Created separate Electron main process file (`main-review.js`) with "Dipper Review" branding
+- Added build scripts to package.json:
+  - `npm run electron-dev-review` - Development mode
+  - `npm run build:review` - React build only
+  - `npm run build:review-all` - React + Python build
+  - `npm run dist:review-mac` - macOS distribution build
+- Created electron-builder-review.json for separate build configuration
+- App builds to `dist-review/` directory
+- JavaScript bundle is 31KB smaller than full app
+- No navigation drawer - full width used for Review interface
+- Includes full Python HTTP server for audio processing
+- See REVIEW_ONLY_APP.md for complete documentation  
+
+
+## Training with hoplite
+I implemented training with hoplite in opso branch
+Now can have a script that
+- selects hoplite db and embedding model
+- ingests various training/val sets with single target or multi-target labels
+- embeds any training/val sets as necessary
+
 
 ## rewind
 - throughout the application, when providing click-to-play spectrograms, make it so that clicking on the left 20% of the spectrogram rewinds the clip to the beginning instead of performing the play/pause action. Show a rewind icon when hovering over the left 20% of the spectrogram. 

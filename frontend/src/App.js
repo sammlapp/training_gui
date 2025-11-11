@@ -89,7 +89,11 @@ function App() {
   const theme = useTheme();
   const [open, setOpen] = useState(false);
   const [hoverOpen, setHoverOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('inference');
+
+  // Check if running in review-only mode
+  const isReviewOnly = process.env.REACT_APP_REVIEW_ONLY === 'true';
+
+  const [activeTab, setActiveTab] = useState(isReviewOnly ? 'review' : 'inference');
   const [currentTask, setCurrentTask] = useState(null);
   const [taskHistory, setTaskHistory] = useState([]);
 
@@ -165,6 +169,18 @@ function App() {
     taskManager.queueTask(task.id);
     console.log('Task created and queued:', task);
   };
+
+  // If review-only mode, render only the ReviewTab without drawer
+  if (isReviewOnly) {
+    return (
+      <Box sx={{ display: 'flex', width: '100%' }}>
+        <CssBaseline />
+        <Box component="main" sx={{ flexGrow: 1, p: 0 }}>
+          <ReviewTab isReviewOnly={true} />
+        </Box>
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ display: 'flex' }}>

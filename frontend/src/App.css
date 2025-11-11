@@ -3798,6 +3798,11 @@ button:disabled {
   /* Minimum height to prevent layout shift */
 }
 
+.review-toolbar-reviewonly{
+  left: 0;
+  width: 100%;
+}
+
 /* Save Status Indicator */
 .save-status-indicator {
   display: flex;
@@ -4528,9 +4533,9 @@ button:disabled {
   flex: 1;
   overflow-y: auto;
   padding: 1rem;
-  padding-top: calc(1rem + 16px);
-  /* Account for fixed toolbar height */
-  padding-bottom: calc(1rem + 16px);
+  padding-top: calc(60px + 1rem);
+  /* Account for fixed toolbar height (~56px) */
+  padding-bottom: calc(1rem + 32px);
   /* Account for fixed status bar height */
   box-sizing: border-box;
   min-height: 0;
@@ -4542,6 +4547,8 @@ button:disabled {
   justify-content: center;
   align-items: flex-start;
   padding: 2rem;
+  padding-top: calc(60px + 2rem);
+  /* Account for fixed toolbar height in focus mode */
 }
 
 .review-content.placeholder-mode {

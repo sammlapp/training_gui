@@ -2,7 +2,7 @@
   "name": "dipper",
   "version": "1.0.0",
   "description": "Cross-platform desktop app for bioacoustics ML training and inference",
-  "main": "src/main.js",
+  "main": "src/main-review.js",
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
@@ -18,6 +18,12 @@
     "electron:pack": "npm run build:all && electron-builder --dir",
     "dist": "npm run build:all && electron-builder",
     "dist:mac": "npm run build:all && electron-builder --mac",
+    "build:review": "cross-env REACT_APP_REVIEW_ONLY=true react-scripts build",
+    "build:review-all": "npm run build:review && npm run build:python-pyinstaller",
+    "electron-dev-review": "concurrently \"cross-env BROWSER=none REACT_APP_REVIEW_ONLY=true npm start\" \"wait-on http://localhost:3000 && cross-env NODE_ENV=development electron src/main-review.js\"",
+    "electron-dev-review-pyinstaller": "concurrently \"cross-env BROWSER=none REACT_APP_REVIEW_ONLY=true npm start\" \"./python-dist/lightweight_server --port 8000\" \"wait-on http://localhost:3000 && wait-on http://localhost:8000/health && cross-env NODE_ENV=development electron src/main-review.js\"",
+    "dist:review": "npm run build:review-all && node scripts/build-review.js",
+    "dist:review-mac": "npm run build:review-all && node scripts/build-review.js --mac",
     "postinstall": "electron-builder install-app-deps"
   },
   "dependencies": {

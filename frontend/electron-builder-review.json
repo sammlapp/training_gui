@@ -1,0 +1,106 @@
+{
+  "extends": null,
+  "appId": "com.bioacoustics.traininggui.review",
+  "productName": "Dipper Review",
+  "directories": {
+    "output": "../dist-review"
+  },
+  "compression": "store",
+  "npmRebuild": false,
+  "buildDependenciesFromSource": false,
+  "files": [
+    "build/**/*",
+    "src/**/*",
+    "dist-electron/**/*",
+    "assets/**/*",
+    "!assets/*.ai",
+    "node_modules/**/*",
+    "!node_modules/.cache",
+    "!node_modules/**/*.d.ts",
+    "!node_modules/**/*.map"
+  ],
+  "extraResources": [
+    {
+      "from": "../backend",
+      "to": "backend",
+      "filter": [
+        "**/*",
+        "!**/__pycache__/**/*",
+        "!**/*.pyc",
+        "!**/*.pyo",
+        "!**/.DS_Store"
+      ]
+    },
+    {
+      "from": "python-dist",
+      "to": "python-dist",
+      "filter": [
+        "**/*",
+        "!**/__pycache__/**/*",
+        "!**/*.pyc",
+        "!**/*.pyo",
+        "!**/.DS_Store"
+      ]
+    }
+  ],
+  "mac": {
+    "category": "public.app-category.productivity",
+    "icon": "assets/icon.icns",
+    "hardenedRuntime": false,
+    "gatekeeperAssess": false,
+    "target": [
+      {
+        "target": "dmg",
+        "arch": [
+          "arm64"
+        ]
+      }
+    ]
+  },
+  "win": {
+    "icon": "assets/icon.svg",
+    "target": [
+      {
+        "target": "nsis",
+        "arch": [
+          "x64"
+        ]
+      }
+    ]
+  },
+  "linux": {
+    "category": "Productivity",
+    "icon": "assets/icon.svg",
+    "target": [
+      {
+        "target": "AppImage",
+        "arch": [
+          "x64"
+        ]
+      }
+    ]
+  },
+  "dmg": {
+    "title": "Dipper Review",
+    "icon": "assets/icon.icns",
+    "background": null,
+    "contents": [
+      {
+        "x": 130,
+        "y": 220
+      },
+      {
+        "x": 410,
+        "y": 220,
+        "type": "link",
+        "path": "/Applications"
+      }
+    ]
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true
+  }
+}

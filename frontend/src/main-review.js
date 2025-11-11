@@ -1,5 +1,6 @@
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
+const url = require('url');
 const { spawn } = require('child_process');
 const fs = require('fs');
 const os = require('os');
@@ -122,17 +123,18 @@ function getCondaPythonPath() {
 }
 
 async function createWindow() {
-  console.log('=== ELECTRON STARTUP ===');
+  console.log('=== DIPPER REVIEW - ELECTRON STARTUP ===');
   console.log('NODE_ENV:', process.env.NODE_ENV);
   console.log('isDev:', isDev);
   console.log('app.isPackaged:', app.isPackaged);
-  
+
   // Start HTTP server for audio processing first
   await startHttpServer();
-  
+
   mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
+    width: 1400,
+    height: 900,
+    title: 'Dipper Review',
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -141,11 +143,23 @@ async function createWindow() {
   });
 
   // Load the app
-  const startUrl = isDev 
-    ? 'http://localhost:3000' 
-    : `file://${path.join(__dirname, '../build/index.html')}`;
-  
+  let startUrl;
+  if (isDev) {
+    startUrl = 'http://localhost:3000';
+  } else {
+    // In production, the build folder is inside app.asar
+    // __dirname will be inside app.asar/src, so go up one level to app.asar root, then into build
+    const indexPath = path.join(__dirname, '..', 'build', 'index.html');
+    startUrl = url.format({
+      pathname: indexPath,
+      protocol: 'file:',
+      slashes: true
+    });
+  }
+
   console.log('Loading URL:', startUrl);
+  console.log('__dirname:', __dirname);
+  console.log('process.resourcesPath:', process.resourcesPath);
   mainWindow.loadURL(startUrl);
 
   if (isDev) {
@@ -259,7 +273,7 @@ async function startHttpServer() {
         console.log(`Starting HTTP server (Python fallback): ${command} ${args.join(' ')}`);
       }
     }
-    
+
     httpServerProcess = spawn(command, args, {
       stdio: ['pipe', 'pipe', 'pipe'],
       cwd: isDev ? path.join(process.cwd(), '..', 'backend') : path.join(process.cwd(), 'backend')
