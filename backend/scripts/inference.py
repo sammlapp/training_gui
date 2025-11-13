@@ -351,22 +351,27 @@ def main():
         else:
             logger.info(f"Running model on {len(files)} files")
 
-        # Inference comes in two flavors:
+        # Inference comes in three flavors:
         # run a classification procedure with model.predict(), or embed to database with .embed_to_hoplite_db()
-        if config_data.get("mode") == "classification":
+        # or run a classifier on hoplite embeddings with .classify_from_hoplite_embeddings()
+        mode = config_data.get("mode")
+        if mode is None:
+            mode = "classification"
+        logger.info("current mode: " + mode)
+        if mode == "classification":
             run_classification(model, files, job_dir, config_data)
-        elif config_data.get("mode") == "embed_to_hoplite":
+        elif mode == "embed_to_hoplite":
             assert hasattr(
                 model, "embed_to_hoplite_db"
             ), "Embedding to a HopLite database is not supported by the selected model: the model object does not have a method `embed_to_hoplite_db()`"
             embed_hoplite(model, files, config_data)
-        elif config_data.get("mode") == "classify_from_hoplite":
+        elif mode == "classify_from_hoplite":
             assert (
                 config_data.get("model_source") == "mlp_classifier"
             ), "When classifying from Hoplite embeddings, you must select a shallow classifier as the model (model_source = 'mlp_classifier')"
         else:
             raise ValueError(
-                f"Unknown mode: {config_data.get('mode')}. Supported modes are 'classification', 'embed_to_hoplite', and 'classify_from_hoplite'"
+                f"Unknown mode: {mode}. Supported modes are 'classification', 'embed_to_hoplite', and 'classify_from_hoplite'"
             )
 
     except Exception as e:

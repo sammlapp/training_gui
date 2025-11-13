@@ -936,6 +936,20 @@ class LightweightServer:
         self.setup_routes()
         self.setup_cors()
 
+    def _get_scripts_path(self):
+        """
+        Get the path to the scripts directory.
+        Works both in development (normal Python) and when bundled with PyInstaller.
+        """
+        if getattr(sys, 'frozen', False):
+            # Running in PyInstaller bundle
+            base_path = sys._MEIPASS
+        else:
+            # Running in normal Python
+            base_path = os.path.dirname(__file__)
+
+        return os.path.join(base_path, "scripts")
+
     def json_response_with_nan_handling(self, data, **kwargs):
         """Create JSON response with proper NaN handling"""
         import json
@@ -1050,7 +1064,7 @@ class LightweightServer:
                 raise ValueError("Invalid folder path")
 
             # Import scan_folder script
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "scripts"))
+            sys.path.insert(0, self._get_scripts_path())
             import scan_folder as sf
 
             # Call scan function
@@ -1072,7 +1086,7 @@ class LightweightServer:
             num_samples = data.get("num_samples", 12)
 
             # Import get_sample_detections script
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "scripts"))
+            sys.path.insert(0, self._get_scripts_path())
             import get_sample_detections as gsd
 
             # Call function
@@ -1097,7 +1111,7 @@ class LightweightServer:
                 raise ValueError("Invalid file path")
 
             # Import load_scores script
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "scripts"))
+            sys.path.insert(0, self._get_scripts_path())
             import load_scores as ls
 
             # Call function with optional max_rows parameter
@@ -1370,7 +1384,7 @@ class LightweightServer:
                 )
 
             # Import load_scores script
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "scripts"))
+            sys.path.insert(0, self._get_scripts_path())
             import load_scores as ls
 
             # Call row count function
@@ -1924,7 +1938,7 @@ class LightweightServer:
                 )
 
             # Import the extraction script functions
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "scripts"))
+            sys.path.insert(0, self._get_scripts_path())
             import create_extraction_task as cet
 
             # Call the scan function from the extraction script
