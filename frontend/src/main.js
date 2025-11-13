@@ -539,41 +539,7 @@ ipcMain.handle('write-file', async (event, filePath, content) => {
   }
 });
 
-// Environment path management
-ipcMain.handle('get-environment-path', async (event, envName) => {
-  try {
-    const userDataPath = app.getPath('userData');
-    const envPath = path.join(userDataPath, 'envs', envName);
-    
-    // Ensure the envs directory exists
-    const envsDir = path.join(userDataPath, 'envs');
-    if (!fs.existsSync(envsDir)) {
-      fs.mkdirSync(envsDir, { recursive: true });
-    }
-    
-    return { success: true, path: envPath };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-});
-
-ipcMain.handle('get-archive-path', async (event, archiveName) => {
-  try {
-    const userDataPath = app.getPath('userData');
-    const archivePath = path.join(userDataPath, 'archives', archiveName);
-    
-    // Ensure the archives directory exists
-    const archivesDir = path.join(userDataPath, 'archives');
-    if (!fs.existsSync(archivesDir)) {
-      fs.mkdirSync(archivesDir, { recursive: true });
-    }
-    
-    return { success: true, path: archivePath };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-});
-
+// User data path
 ipcMain.handle('get-user-data-path', async () => {
   try {
     const userDataPath = app.getPath('userData');

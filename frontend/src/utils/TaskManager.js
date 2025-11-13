@@ -269,23 +269,12 @@ class TaskManager {
       // Update progress
       this.updateTask(task.id, { progress: 'Setting up ML environment...' });
 
-      // Get environment paths - use custom environment if specified
-      let envPath, archivePath;
+      // Get environment path - use custom environment if specified, otherwise null for default
+      let envPath = null;
       if (config.use_custom_python_env && config.custom_python_env_path) {
         envPath = config.custom_python_env_path;
-        archivePath = ''; // No archive needed for custom environments
-      } else {
-        // Use default environment
-        const envPathResult = await window.electronAPI.getEnvironmentPath('dipper_pytorch_env');
-        const archivePathResult = await window.electronAPI.getArchivePath('dipper_pytorch_env.tar.gz');
-
-        if (!envPathResult.success || !archivePathResult.success) {
-          throw new Error('Failed to get environment paths');
-        }
-
-        envPath = envPathResult.path;
-        archivePath = archivePathResult.path;
       }
+      // If envPath is null, backend will use default cache directory and auto-download if needed
 
       // Update progress
       this.updateTask(task.id, { progress: 'Running inference...' });
@@ -299,7 +288,6 @@ class TaskManager {
         body: JSON.stringify({
           config_path: tempConfigPath,
           env_path: envPath,
-          archive_path: archivePath,
           job_id: processId
         })
       });
@@ -468,23 +456,12 @@ class TaskManager {
       // Update progress
       this.updateTask(task.id, { progress: 'Setting up ML environment...' });
 
-      // Get environment paths - use custom environment if specified
-      let envPath, archivePath;
+      // Get environment path - use custom environment if specified, otherwise null for default
+      let envPath = null;
       if (config.use_custom_python_env && config.custom_python_env_path) {
         envPath = config.custom_python_env_path;
-        archivePath = ''; // No archive needed for custom environments
-      } else {
-        // Use default environment
-        const envPathResult = await window.electronAPI.getEnvironmentPath('dipper_pytorch_env');
-        const archivePathResult = await window.electronAPI.getArchivePath('dipper_pytorch_env.tar.gz');
-
-        if (!envPathResult.success || !archivePathResult.success) {
-          throw new Error('Failed to get environment paths');
-        }
-
-        envPath = envPathResult.path;
-        archivePath = archivePathResult.path;
       }
+      // If envPath is null, backend will use default cache directory and auto-download if needed
 
       // Update progress
       this.updateTask(task.id, { progress: 'Starting training...' });
@@ -498,7 +475,6 @@ class TaskManager {
         body: JSON.stringify({
           config_path: tempConfigPath,
           env_path: envPath,
-          archive_path: archivePath,
           job_id: processId
         })
       });
@@ -659,23 +635,12 @@ class TaskManager {
       // Update progress
       this.updateTask(task.id, { progress: 'Setting up ML environment...' });
 
-      // Get environment paths - use custom environment if specified
-      let envPath, archivePath;
+      // Get environment path - use custom environment if specified, otherwise null for default
+      let envPath = null;
       if (config.use_custom_python_env && config.custom_python_env_path) {
         envPath = config.custom_python_env_path;
-        archivePath = ''; // No archive needed for custom environments
-      } else {
-        // Use default environment
-        const envPathResult = await window.electronAPI.getEnvironmentPath('dipper_pytorch_env');
-        const archivePathResult = await window.electronAPI.getArchivePath('dipper_pytorch_env.tar.gz');
-
-        if (!envPathResult.success || !archivePathResult.success) {
-          throw new Error('Failed to get environment paths');
-        }
-
-        envPath = envPathResult.path;
-        archivePath = archivePathResult.path;
       }
+      // If envPath is null, backend will use default cache directory and auto-download if needed
 
       // Update progress
       this.updateTask(task.id, { progress: 'Creating annotation task...' });
@@ -689,7 +654,6 @@ class TaskManager {
         body: JSON.stringify({
           config_path: tempConfigPath,
           env_path: envPath,
-          archive_path: archivePath,
           job_id: processId
         })
       });

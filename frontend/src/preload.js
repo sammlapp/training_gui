@@ -25,9 +25,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   createAudioClips: (filePath, startTime, endTime, settings) =>
     ipcRenderer.invoke('create-audio-clips', filePath, startTime, endTime, settings),
 
-  // Environment path management
-  getEnvironmentPath: (envName) => ipcRenderer.invoke('get-environment-path', envName),
-  getArchivePath: (archiveName) => ipcRenderer.invoke('get-archive-path', archiveName),
+  // User data path
   getUserDataPath: () => ipcRenderer.invoke('get-user-data-path'),
 
   // Python output listener

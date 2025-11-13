@@ -31,6 +31,9 @@ from io import BytesIO
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Google Drive file ID for PyTorch environment
+PYTORCH_ENV_FILE_ID = "1rsJjnCWjkiMDPimwg11QKsI-tOS7To8O"
+
 
 def get_last_error_from_log(log_file_path, max_lines=10):
     """
@@ -131,6 +134,51 @@ def validate_audio_files(file_list):
 
 
 # Environment Management Functions
+def get_default_env_path():
+    """Get the default environment path in system-specific cache directory"""
+    cache_dir = get_default_env_cache_dir()
+    env_path = os.path.join(cache_dir, "envs/dipper_pytorch_env")
+    return env_path
+    # # Fallback to local directory # No fallback!
+    # return os.path.join(os.path.expanduser("~"), ".dipper", "env")
+
+
+def get_default_env_archive_path():
+    """Get the default environment archive path in system-specific cache directory"""
+    cache_dir = get_default_env_cache_dir()
+    env_path = os.path.join(cache_dir, "archives/dipper_pytorch_env.tar.gz")
+    return env_path
+
+
+def get_default_env_cache_dir():
+    """Get the default environment caching folder in system-specific cache directory"""
+    sys.path.insert(0, _get_scripts_path())
+    import appdirs
+
+    return appdirs.user_cache_dir("Dipper", "BioacousticsApp")
+
+
+def download_environment_from_gdrive():
+    """Download PyTorch environment from Google Drive to cache directory"""
+    try:
+        import gdown
+
+        archive_path = get_default_env_archive_path()
+        logger.info(f"Downloading PyTorch environment to {archive_path}...")
+        os.makedirs(os.path.dirname(archive_path), exist_ok=True)
+
+        # Download using gdown with file ID
+        url = f"https://drive.google.com/uc?id={PYTORCH_ENV_FILE_ID}"
+        gdown.download(url, archive_path, quiet=False)
+
+        logger.info(f"Download complete: {archive_path}")
+        return {"status": "success", "archive_path": archive_path}
+
+    except Exception as e:
+        logger.error(f"Error downloading environment: {e}")
+        return {"status": "error", "error": str(e)}
+
+
 def check_environment(env_path):
     """Check if conda-pack environment exists and is valid"""
     try:
@@ -200,19 +248,45 @@ def resolve_path(path_str, base_dir=None):
             return os.path.abspath(path_str)
 
 
-def setup_environment(env_dir, archive_path=None):
-    """Set up environment - extract if needed, check if ready"""
+def setup_environment(env_dir=None):
+    """Set up environment - extract if needed, check if ready
+
+    Args:
+        env_dir: Environment directory if using a custom Python environment
+            if None, will use the built-in Dipper environment in application cache directory
+            (downloading and/or extracting .tar.gz if needed)
+
+    Returns:
+        dict: Status and details about the environment setup
+    """
     try:
-        # Resolve paths to absolute paths for consistency
-        env_dir = resolve_path(env_dir)
-        if archive_path:
-            archive_path = resolve_path(archive_path)
+        # If user provided custom environment path, use that environment
+        if env_dir is not None:
+            # Resolve custom path
+            env_dir = resolve_path(env_dir)
+            logger.info(f"Using custom environment path: {env_dir}")
 
-        logger.info(f"Setting up environment at: {env_dir}")
-        if archive_path:
-            logger.info(f"Archive path: {archive_path}")
+            env_check = check_environment(env_dir)
 
-        # First check if environment already exists
+            if env_check["status"] == "ready":
+                return {
+                    "status": "ready",
+                    "python_path": env_check["python_path"],
+                    "message": "Environment already ready",
+                }
+            else:
+                return {
+                    "status": "error",
+                    "error": f"User-specified custom environment {env_dir} could not be used: {env_check.get('error', 'Unknown error')}",
+                }
+
+        # Use the built-in Dipper environment, downloading and/or extracting .tar.gz if needed
+
+        # first get the default environment path for this operating system
+        env_dir = get_default_env_path()
+        logger.info(f"Using default environment path: {env_dir}")
+
+        # check if environment already exists
         env_check = check_environment(env_dir)
 
         if env_check["status"] == "ready":
@@ -222,42 +296,56 @@ def setup_environment(env_dir, archive_path=None):
                 "message": "Environment already ready",
             }
 
-        # If environment doesn't exist and we have an archive, extract it
-        if (
-            env_check["status"] == "missing"
-            and archive_path
-            and os.path.exists(archive_path)
-        ):
-            logger.info(f"Environment not found, extracting from {archive_path}")
-            extract_result = extract_environment(archive_path, env_dir)
+        # Environment is not yet ready
+        # we may need to download it then extract it
+        # or just extract it if we already have the archive file
+        # in the expected location
 
-            if extract_result["status"] == "success":
-                # Check again after extraction
-                final_check = check_environment(env_dir)
-                if final_check["status"] == "ready":
-                    return {
-                        "status": "ready",
-                        "python_path": final_check["python_path"],
-                        "message": "Environment extracted and ready",
-                    }
-                else:
-                    return {
-                        "status": "error",
-                        "error": f"Environment setup failed: {final_check.get('error', 'Unknown error')}",
-                    }
+        # Check cache directory for archive
+        archive_path = get_default_env_archive_path()
+
+        if os.path.exists(archive_path):
+            logger.info(f"Using cached archive: {archive_path}")
+        else:
+            # Download from Google Drive
+            logger.info("Archive not found in cache, downloading from Google Drive...")
+            download_result = download_environment_from_gdrive()
+
+            if download_result["status"] == "success":
+                logger.info(f"Downloaded archive to: {archive_path}")
             else:
-                return extract_result
+                return {
+                    "status": "error",
+                    "error": f"Failed to download environment: {download_result.get('error', 'Unknown error')}",
+                }
 
-        # Environment missing and no archive provided
-        return {
-            "status": "missing",
-            "error": f"Environment not found at {env_dir}"
-            + (
-                f" and no archive provided"
-                if not archive_path
-                else f" and archive not found at {archive_path}"
-            ),
-        }
+        # Extract environment
+        if not os.path.exists(archive_path):
+            return {
+                "status": "error",
+                "error": f"Archive not found at {archive_path}",
+            }
+
+        # Extract the environment from the cached archive file
+        logger.info(f"Extracting environment from {archive_path} to {env_dir}")
+        extract_result = extract_environment(archive_path, env_dir)
+
+        if extract_result["status"] == "success":
+            # Check again after extraction
+            final_check = check_environment(env_dir)
+            if final_check["status"] == "ready":
+                return {
+                    "status": "ready",
+                    "python_path": final_check["python_path"],
+                    "message": "Environment extracted and ready",
+                }
+            else:
+                return {
+                    "status": "error",
+                    "error": f"Environment setup failed: {final_check.get('error', 'Unknown error')}",
+                }
+        else:
+            return extract_result
 
     except Exception as e:
         return {"status": "error", "error": str(e)}
@@ -359,10 +447,31 @@ def check_inference_status(process, job_info=None):
 
         if return_code is None:
             # Process is still running
-            return {
+            status_response = {
                 "status": "running",
                 "message": "Inference process is still running",
             }
+
+            # Try to read detailed status from .status file
+            if job_info and "job_folder" in job_info:
+                status_file = os.path.join(job_info["job_folder"], ".status")
+                if os.path.exists(status_file):
+                    try:
+                        with open(status_file, 'r') as f:
+                            status_data = json.load(f)
+                            # Merge status file data into response
+                            if "stage" in status_data:
+                                status_response["stage"] = status_data["stage"]
+                            if "progress" in status_data:
+                                status_response["progress"] = status_data["progress"]
+                            if "message" in status_data:
+                                status_response["message"] = status_data["message"]
+                            if "metadata" in status_data:
+                                status_response["metadata"] = status_data["metadata"]
+                    except Exception as e:
+                        logger.debug(f"Could not read status file: {e}")
+
+            return status_response
         else:
             # Process has completed
             # Close log file if it was opened
@@ -605,7 +714,31 @@ def check_training_status(process, job_info=None):
 
         if return_code is None:
             # Process is still running
-            return {"status": "running", "message": "Training process is still running"}
+            status_response = {
+                "status": "running",
+                "message": "Training process is still running",
+            }
+
+            # Try to read detailed status from .status file
+            if job_info and "job_folder" in job_info:
+                status_file = os.path.join(job_info["job_folder"], ".status")
+                if os.path.exists(status_file):
+                    try:
+                        with open(status_file, 'r') as f:
+                            status_data = json.load(f)
+                            # Merge status file data into response
+                            if "stage" in status_data:
+                                status_response["stage"] = status_data["stage"]
+                            if "progress" in status_data:
+                                status_response["progress"] = status_data["progress"]
+                            if "message" in status_data:
+                                status_response["message"] = status_data["message"]
+                            if "metadata" in status_data:
+                                status_response["metadata"] = status_data["metadata"]
+                    except Exception as e:
+                        logger.debug(f"Could not read status file: {e}")
+
+            return status_response
         else:
             # Process has completed
             # Close log file if it was opened
@@ -680,10 +813,31 @@ def check_extraction_status(process, job_info=None):
 
         if return_code is None:
             # Process is still running
-            return {
+            status_response = {
                 "status": "running",
                 "message": "Extraction process is still running",
             }
+
+            # Try to read detailed status from .status file
+            if job_info and "job_folder" in job_info:
+                status_file = os.path.join(job_info["job_folder"], ".status")
+                if os.path.exists(status_file):
+                    try:
+                        with open(status_file, 'r') as f:
+                            status_data = json.load(f)
+                            # Merge status file data into response
+                            if "stage" in status_data:
+                                status_response["stage"] = status_data["stage"]
+                            if "progress" in status_data:
+                                status_response["progress"] = status_data["progress"]
+                            if "message" in status_data:
+                                status_response["message"] = status_data["message"]
+                            if "metadata" in status_data:
+                                status_response["metadata"] = status_data["metadata"]
+                    except Exception as e:
+                        logger.debug(f"Could not read status file: {e}")
+
+            return status_response
         else:
             # Process has completed
             # Close log file if it was opened
@@ -926,6 +1080,21 @@ def process_single_clip(clip_data, settings):
         }
 
 
+def _get_scripts_path():
+    """
+    Get the path to the scripts directory.
+    Works both in development (normal Python) and when bundled with PyInstaller.
+    """
+    if getattr(sys, "frozen", False):
+        # Running in PyInstaller bundle
+        base_path = sys._MEIPASS
+    else:
+        # Running in normal Python
+        base_path = os.path.dirname(__file__)
+
+    return os.path.join(base_path, "scripts")
+
+
 class LightweightServer:
     def __init__(self, port=8000):
         self.port = port
@@ -935,20 +1104,6 @@ class LightweightServer:
         )  # Track running inference jobs: {job_id: {process, task, status, result}}
         self.setup_routes()
         self.setup_cors()
-
-    def _get_scripts_path(self):
-        """
-        Get the path to the scripts directory.
-        Works both in development (normal Python) and when bundled with PyInstaller.
-        """
-        if getattr(sys, 'frozen', False):
-            # Running in PyInstaller bundle
-            base_path = sys._MEIPASS
-        else:
-            # Running in normal Python
-            base_path = os.path.dirname(__file__)
-
-        return os.path.join(base_path, "scripts")
 
     def json_response_with_nan_handling(self, data, **kwargs):
         """Create JSON response with proper NaN handling"""
@@ -1064,7 +1219,7 @@ class LightweightServer:
                 raise ValueError("Invalid folder path")
 
             # Import scan_folder script
-            sys.path.insert(0, self._get_scripts_path())
+            sys.path.insert(0, _get_scripts_path())
             import scan_folder as sf
 
             # Call scan function
@@ -1086,7 +1241,7 @@ class LightweightServer:
             num_samples = data.get("num_samples", 12)
 
             # Import get_sample_detections script
-            sys.path.insert(0, self._get_scripts_path())
+            sys.path.insert(0, _get_scripts_path())
             import get_sample_detections as gsd
 
             # Call function
@@ -1111,7 +1266,7 @@ class LightweightServer:
                 raise ValueError("Invalid file path")
 
             # Import load_scores script
-            sys.path.insert(0, self._get_scripts_path())
+            sys.path.insert(0, _get_scripts_path())
             import load_scores as ls
 
             # Call function with optional max_rows parameter
@@ -1384,7 +1539,7 @@ class LightweightServer:
                 )
 
             # Import load_scores script
-            sys.path.insert(0, self._get_scripts_path())
+            sys.path.insert(0, _get_scripts_path())
             import load_scores as ls
 
             # Call row count function
@@ -1541,13 +1696,20 @@ class LightweightServer:
 
     # Environment Management Routes
     async def check_env(self, request):
-        """Check conda-pack environment status"""
+        """Check conda-pack environment status
+
+        If env_path not provided or None, uses default system cache directory
+        """
         try:
             data = await request.json()
-            env_path = data.get("env_path")
+            env_path = data.get("env_path")  # Could be None for default
 
-            if not env_path:
-                return web.json_response({"error": "env_path required"}, status=400)
+            # Use default cache directory if not provided
+            if env_path is None:
+                env_path = get_default_env_path()
+                logger.info(f"Using default env path for check: {env_path}")
+            else:
+                logger.info(f"Using custom env path for check: {env_path}")
 
             result = check_environment(env_path)
             return web.json_response(result)
@@ -1557,16 +1719,16 @@ class LightweightServer:
             return web.json_response({"status": "error", "error": str(e)}, status=500)
 
     async def setup_env(self, request):
-        """Setup conda-pack environment (extract if needed)"""
+        """Setup conda-pack environment (extract if needed)
+
+        If env_path not provided or None, uses default system cache directory and auto-downloads from Google Drive if needed.
+        If env_path is provided, uses that custom environment (must already exist).
+        """
         try:
             data = await request.json()
-            env_path = data.get("env_path")
-            archive_path = data.get("archive_path")
+            env_path = data.get("env_path")  # None = use default cache, or custom path
 
-            if not env_path:
-                return web.json_response({"error": "env_path required"}, status=400)
-
-            result = setup_environment(env_path, archive_path)
+            result = setup_environment(env_path)
             return web.json_response(result)
 
         except Exception as e:
@@ -1580,7 +1742,6 @@ class LightweightServer:
             data = await request.json()
             config_path = data.get("config_path")
             env_path = data.get("env_path")
-            archive_path = data.get("archive_path")
             job_id = data.get(
                 "job_id", f"job_{int(asyncio.get_event_loop().time() * 1000)}"
             )
@@ -1588,16 +1749,13 @@ class LightweightServer:
             logger.info(f"Inference request received:")
             logger.info(f"  job_id: {job_id}")
             logger.info(f"  config_path: {config_path}")
-            logger.info(f"  env_path: {env_path}")
-            logger.info(f"  archive_path: {archive_path}")
+            logger.info(f"  env_path: {env_path if env_path else 'default'}")
 
-            if not config_path or not env_path:
-                return web.json_response(
-                    {"error": "config_path and env_path required"}, status=400
-                )
+            if not config_path:
+                return web.json_response({"error": "config_path required"}, status=400)
 
-            # First check/setup environment
-            env_result = setup_environment(env_path, archive_path)
+            # First check/setup environment (env_path can be None for default)
+            env_result = setup_environment(env_path)
             if env_result["status"] != "ready":
                 logger.error(f"Environment setup failed: {env_result}")
                 return web.json_response(env_result, status=500)
@@ -1754,7 +1912,6 @@ class LightweightServer:
             data = await request.json()
             config_path = data.get("config_path")
             env_path = data.get("env_path")
-            archive_path = data.get("archive_path")
             job_id = data.get(
                 "job_id", f"training_job_{int(asyncio.get_event_loop().time() * 1000)}"
             )
@@ -1762,16 +1919,13 @@ class LightweightServer:
             logger.info(f"Training request received:")
             logger.info(f"  job_id: {job_id}")
             logger.info(f"  config_path: {config_path}")
-            logger.info(f"  env_path: {env_path}")
-            logger.info(f"  archive_path: {archive_path}")
+            logger.info(f"  env_path: {env_path if env_path else 'default'}")
 
-            if not config_path or not env_path:
-                return web.json_response(
-                    {"error": "config_path and env_path required"}, status=400
-                )
+            if not config_path:
+                return web.json_response({"error": "config_path required"}, status=400)
 
-            # First check/setup environment
-            env_result = setup_environment(env_path, archive_path)
+            # First check/setup environment (env_path can be None for default)
+            env_result = setup_environment(env_path)
             if env_result["status"] != "ready":
                 logger.error(f"Environment setup failed: {env_result}")
                 return web.json_response(env_result, status=500)
@@ -1938,7 +2092,7 @@ class LightweightServer:
                 )
 
             # Import the extraction script functions
-            sys.path.insert(0, self._get_scripts_path())
+            sys.path.insert(0, _get_scripts_path())
             import create_extraction_task as cet
 
             # Call the scan function from the extraction script
@@ -1956,7 +2110,6 @@ class LightweightServer:
             data = await request.json()
             config_path = data.get("config_path")
             env_path = data.get("env_path")
-            archive_path = data.get("archive_path")
             job_id = data.get(
                 "job_id",
                 f"extraction_job_{int(asyncio.get_event_loop().time() * 1000)}",
@@ -1965,16 +2118,13 @@ class LightweightServer:
             logger.info(f"Annotation request received:")
             logger.info(f"  job_id: {job_id}")
             logger.info(f"  config_path: {config_path}")
-            logger.info(f"  env_path: {env_path}")
-            logger.info(f"  archive_path: {archive_path}")
+            logger.info(f"  env_path: {env_path if env_path else 'default'}")
 
-            if not config_path or not env_path:
-                return web.json_response(
-                    {"error": "config_path and env_path required"}, status=400
-                )
+            if not config_path:
+                return web.json_response({"error": "config_path required"}, status=400)
 
-            # First check/setup environment
-            env_result = setup_environment(env_path, archive_path)
+            # First check/setup environment (env_path can be None for default)
+            env_result = setup_environment(env_path)
             if env_result["status"] != "ready":
                 logger.error(f"Environment setup failed: {env_result}")
                 return web.json_response(env_result, status=500)
