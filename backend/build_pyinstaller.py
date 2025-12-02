@@ -112,13 +112,20 @@ def build_with_pyinstaller(pyinstaller_exe, venv_path):
         shutil.rmtree(DIST_DIR)
     DIST_DIR.mkdir(parents=True, exist_ok=True)
 
-    # Copy lightweight server
-    source_dist = BACKEND_DIR / "dist" / "lightweight_server"
+    # Copy lightweight server (handle both Unix and Windows)
+    if os.name == "nt":  # Windows
+        source_dist = BACKEND_DIR / "dist" / "lightweight_server.exe"
+        dest_file = DIST_DIR / "lightweight_server.exe"
+    else:  # Unix-like
+        source_dist = BACKEND_DIR / "dist" / "lightweight_server"
+        dest_file = DIST_DIR / "lightweight_server"
+
     if source_dist.exists():
-        shutil.copy2(source_dist, DIST_DIR / "lightweight_server")
+        shutil.copy2(source_dist, dest_file)
         print("✅ Lightweight server executable copied successfully!")
     else:
         print("❌ Lightweight server executable not found in dist directory")
+        print(f"   Expected location: {source_dist}")
         sys.exit(1)
 
 
@@ -150,7 +157,11 @@ def main():
         print(f"📦 Executable location: {DIST_DIR}")
 
         # Show size information
-        exe_path = DIST_DIR / "lightweight_server"
+        if os.name == "nt":
+            exe_path = DIST_DIR / "lightweight_server.exe"
+        else:
+            exe_path = DIST_DIR / "lightweight_server"
+
         if exe_path.exists():
             # Calculate total size
             total_size = sum(

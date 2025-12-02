@@ -2,12 +2,6 @@ name: Build Conda-Pack Environment
 
 on:
   workflow_dispatch:
-    inputs:
-      platforms:
-        description: 'Platforms to build (comma-separated: macos-x64, macos-arm64, windows, linux, or "all")'
-        required: true
-        default: 'all'
-        type: string
 
 jobs:
   build-conda-pack:
@@ -29,9 +23,6 @@ jobs:
           - platform: linux
             os: ubuntu-latest
             artifact_name: conda-env-linux-x64
-
-    # Only run for selected platforms
-    if: inputs.platforms == 'all' || contains(inputs.platforms, matrix.platform)
 
     steps:
       - name: Checkout code
