@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import Select from 'react-select';
 import HelpIcon from './HelpIcon';
 import { selectFolder, saveFile, selectJSONFiles } from '../utils/fileOperations';
+import { getBackendUrl } from '../utils/backendConfig';
 
 // Default values for extraction task creation form
 const DEFAULT_VALUES = {
@@ -54,7 +55,8 @@ function ExtractionTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
 
   const scanPredictionsFolder = async (folderPath) => {
     try {
-      const response = await fetch('http://localhost:8000/extraction/scan-predictions', {
+      const backendUrl = await getBackendUrl();
+      const response = await fetch(`${backendUrl}/extraction/scan-predictions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -185,7 +187,8 @@ function ExtractionTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
           extraction_mode: config.extraction_mode
         };
 
-        const response = await fetch('http://localhost:8000/config/save', {
+        const backendUrl = await getBackendUrl();
+        const response = await fetch(`${backendUrl}/config/save`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -212,7 +215,8 @@ function ExtractionTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
     try {
       const configFile = await selectJSONFiles();
       if (configFile && configFile.length > 0) {
-        const response = await fetch('http://localhost:8000/config/load', {
+        const backendUrl = await getBackendUrl();
+        const response = await fetch(`${backendUrl}/config/load`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

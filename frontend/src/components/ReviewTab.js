@@ -14,8 +14,10 @@ import {
   getNumericColumns
 } from '../utils/stratificationUtils';
 import { selectCSVFiles, selectFolder, saveFile, writeFile } from '../utils/fileOperations';
+import { useBackendUrl } from '../hooks/useBackendUrl';
 
 function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
+  const backendUrl = useBackendUrl();
   const [selectedFile, setSelectedFile] = useState('');
   const [annotationData, setAnnotationData] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -88,7 +90,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
   const fileInputRef = useRef(null);
 
   // HTTP-based loader (fast and reliable)
-  const httpLoader = useHttpAudioLoader('http://localhost:8000');
+  const httpLoader = useHttpAudioLoader(`${backendUrl}`);
 
   // Helper function to get image dimensions based on focus size setting
   const getFocusImageDimensions = (focusSize) => {
@@ -672,7 +674,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
       localStorage.setItem('review_settings', JSON.stringify(newSettings));
 
       // Use HTTP endpoint to load CSV file
-      const response = await fetch('http://localhost:8000/review/load-task', {
+      const response = await fetch(`${backendUrl}/review/load-task`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -2050,7 +2052,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
                 currentSettings={settings}
               />
               <HttpServerStatus
-                serverUrl="http://localhost:8000"
+                serverUrl="${backendUrl}"
                 onClearCache={httpLoader.clearCache}
                 onGetStats={httpLoader.getServerStats}
               />

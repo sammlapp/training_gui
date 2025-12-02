@@ -18,6 +18,7 @@ import {
   showModelFilePicker,
   showSaveDialog
 } from './serverFilePicker';
+import { getBackendUrl } from './backendConfig';
 
 /**
  * Check if Tauri is available (v1 or v2)
@@ -190,7 +191,8 @@ export const generateUniqueFolderName = async (basePath, folderName) => {
     throw new Error('Local mode unique folder name generation not available');
   } else {
     // Server mode: Use HTTP endpoint (to be implemented in Phase 4)
-    const response = await fetch('http://localhost:8000/files/unique-name', {
+    const backendUrl = await getBackendUrl();
+    const response = await fetch(`${backendUrl}/files/unique-name`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ basePath, folderName })
@@ -248,7 +250,8 @@ export const writeFile = async (filePath, content) => {
     throw new Error('Local mode file write not available');
   } else {
     // Server mode: Use HTTP endpoint (to be implemented in Phase 4)
-    const response = await fetch('http://localhost:8000/files/save', {
+    const backendUrl = await getBackendUrl();
+    const response = await fetch(`${backendUrl}/files/save`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ path: filePath, content })

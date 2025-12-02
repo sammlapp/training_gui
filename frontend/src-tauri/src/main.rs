@@ -2,15 +2,20 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::fs;
+use std::net::TcpListener;
 use std::path::PathBuf;
-use std::process::Child;
+use std::sync::Mutex;
 use std::thread;
 use std::time::Duration;
 use tauri::Manager;
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_shell::ShellExt;
 
-const HTTP_SERVER_PORT: u16 = 8000;
+// State to store the backend server port and process
+struct BackendState {
+    port: Mutex<Option<u16>>,
+    process: Mutex<Option<tauri_plugin_shell::process::CommandChild>>,
+}
 
 /// Select multiple files
 #[tauri::command]
@@ -191,53 +196,160 @@ async fn generate_unique_folder_name(base_path: String, folder_name: String) -> 
     }
 }
 
-/// Check if the HTTP server is already running
-fn check_server_running() -> bool {
-    match std::net::TcpStream::connect_timeout(
-        &format!("127.0.0.1:{}", HTTP_SERVER_PORT).parse().unwrap(),
-        Duration::from_secs(1)
-    ) {
-        Ok(_) => true,
-        Err(_) => false,
+/// Get a free port from the OS
+fn get_free_port() -> Option<u16> {
+    // Bind to port 0 to let the OS assign a free port
+    match TcpListener::bind(("127.0.0.1", 0)) {
+        Ok(listener) => {
+            match listener.local_addr() {
+                Ok(addr) => Some(addr.port()),
+                Err(_) => None
+            }
+        }
+        Err(_) => None
     }
 }
 
-/// Wait for the server to be ready
-fn wait_for_server(max_retries: u32) -> bool {
+/// Check if the Dipper backend server is running on the given port
+/// Returns true only if the server responds to /health with the expected response
+fn check_dipper_backend_running(port: u16) -> bool {
+    // Build the health check URL
+    let url = format!("http://127.0.0.1:{}/health", port);
+
+    // Try to connect and check the health endpoint with a longer timeout
+    match ureq::get(&url).timeout(Duration::from_secs(5)).call() {
+        Ok(response) => {
+            let status_code = response.status();
+            println!("  Health check got HTTP {}", status_code);
+
+            if status_code == 200 {
+                // Try to parse the JSON response
+                match response.into_string() {
+                    Ok(body) => {
+                        println!("  Health response body: {}", body);
+                        match serde_json::from_str::<serde_json::Value>(&body) {
+                            Ok(json) => {
+                                // Verify it's the Dipper backend by checking for expected fields
+                                let status = json.get("status").and_then(|v| v.as_str());
+                                let server_type = json.get("server_type").and_then(|v| v.as_str());
+
+                                println!("  Parsed: status={:?}, server_type={:?}", status, server_type);
+
+                                if status == Some("ok") && server_type == Some("lightweight") {
+                                    println!("  ✓ Valid Dipper backend detected!");
+                                    return true;
+                                } else {
+                                    println!("  ✗ Response doesn't match Dipper backend signature");
+                                }
+                            }
+                            Err(e) => {
+                                println!("  ✗ Failed to parse JSON: {}", e);
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        println!("  ✗ Failed to read response body: {}", e);
+                    }
+                }
+            } else {
+                println!("  ✗ Unexpected status code: {}", status_code);
+            }
+            false
+        }
+        Err(e) => {
+            println!("  ✗ Connection failed: {}", e);
+            false
+        }
+    }
+}
+
+/// Wait for the Dipper backend to be ready on the given port
+fn wait_for_server(port: u16, max_retries: u32) -> bool {
     for i in 0..max_retries {
-        if check_server_running() {
-            println!("HTTP server is ready!");
+        if check_dipper_backend_running(port) {
+            println!("✓ Dipper backend health check passed on port {}!", port);
             return true;
         }
-        println!("Waiting for HTTP server... ({}/{})", i + 1, max_retries);
-        thread::sleep(Duration::from_secs(1));
+        if i < 3 || i % 5 == 0 {
+            // Only print every 5th attempt after the first 3 to reduce spam
+            println!("⏳ Checking backend health on port {}... (attempt {}/{})", port, i + 1, max_retries);
+        }
+        thread::sleep(Duration::from_millis(1500));
     }
-    eprintln!("HTTP server failed to start within timeout period");
+    eprintln!("✗ Backend health check timed out after {} attempts", max_retries);
     false
 }
 
-/// Start the backend HTTP server using Tauri's sidecar mechanism (non-blocking)
-fn start_backend_server(app: &tauri::AppHandle) {
-    // Check if server is already running
-    if check_server_running() {
-        println!("HTTP server already running on port {}", HTTP_SERVER_PORT);
-        return;
-    }
+/// Tauri command to get the backend server port
+#[tauri::command]
+async fn get_backend_port(state: tauri::State<'_, BackendState>) -> Result<u16, String> {
+    state.port.lock().unwrap()
+        .ok_or_else(|| "Backend port not initialized".to_string())
+}
 
-    println!("Starting HTTP server sidecar...");
+/// Start the backend HTTP server using Tauri's sidecar mechanism (non-blocking)
+fn start_backend_server(app: &tauri::AppHandle, port: u16) -> Option<tauri_plugin_shell::process::CommandChild> {
+    println!("Starting Dipper backend sidecar on port {}...", port);
 
     // Use Tauri's sidecar API to spawn the bundled executable
-    let sidecar = app.shell().sidecar("lightweight_server").unwrap();
-
-    match sidecar
-        .args(["--port", &HTTP_SERVER_PORT.to_string()])
-        .spawn()
-    {
-        Ok(_) => {
-            println!("HTTP server sidecar spawned successfully");
+    let sidecar = match app.shell().sidecar("lightweight_server") {
+        Ok(cmd) => {
+            println!("  Sidecar command created successfully");
+            cmd
         }
         Err(e) => {
-            eprintln!("Failed to start HTTP server sidecar: {}", e);
+            eprintln!("✗ Failed to create sidecar command: {}", e);
+            eprintln!("  Make sure the binary exists in src-tauri/bin/lightweight_server-*");
+            return None;
+        }
+    };
+
+    println!("  Spawning with args: --port {}", port);
+
+    match sidecar
+        .args(["--port", &port.to_string()])
+        .spawn()
+    {
+        Ok((mut rx, child)) => {
+            println!("✓ Dipper backend sidecar spawned (PID: {:?})", child.pid());
+
+            // Spawn a thread to read backend output using blocking receiver
+            std::thread::spawn(move || {
+                use tauri_plugin_shell::process::CommandEvent;
+                loop {
+                    match rx.blocking_recv() {
+                        Some(event) => {
+                            match event {
+                                CommandEvent::Stdout(line) => {
+                                    println!("  [Backend stdout] {}", String::from_utf8_lossy(&line));
+                                }
+                                CommandEvent::Stderr(line) => {
+                                    eprintln!("  [Backend stderr] {}", String::from_utf8_lossy(&line));
+                                }
+                                CommandEvent::Error(err) => {
+                                    eprintln!("  [Backend error] {}", err);
+                                }
+                                CommandEvent::Terminated(payload) => {
+                                    println!("  [Backend terminated] code: {:?}", payload.code);
+                                    break;
+                                }
+                                _ => {}
+                            }
+                        }
+                        None => {
+                            println!("  [Backend output stream closed]");
+                            break;
+                        }
+                    }
+                }
+            });
+
+            Some(child)
+        }
+        Err(e) => {
+            eprintln!("✗ Failed to spawn Dipper backend sidecar: {}", e);
+            eprintln!("  Error details: {:?}", e);
+            None
         }
     }
 }
@@ -249,6 +361,10 @@ fn main() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_shell::init())
+        .manage(BackendState {
+            port: Mutex::new(None),
+            process: Mutex::new(None),
+        })
         .setup(|app| {
             // Get window handles
             let splash_window = app.get_webview_window("splash").expect("Splash window not found");
@@ -343,8 +459,33 @@ fn main() {
             // Show splash screen immediately
             splash_window.show().expect("Failed to show splash window");
 
-            // Start the backend server (non-blocking)
-            start_backend_server(&app.handle());
+            // Check if Dipper backend is already running on port 8000 (for dev mode with manual backend)
+            let (port, child_process) = if check_dipper_backend_running(8000) {
+                println!("✓ Using existing Dipper backend on port 8000 (dev mode)");
+                (8000, None)
+            } else {
+                // Get a free port from the OS
+                let free_port = get_free_port().expect("Failed to get free port");
+                println!("→ No backend found on port 8000, starting on port {}", free_port);
+
+                // Start our own backend
+                let child = start_backend_server(&app.handle(), free_port);
+
+                if child.is_none() {
+                    eprintln!("✗ Failed to start backend server on port {}", free_port);
+                    eprintln!("  Check that the sidecar binary exists in src-tauri/bin/");
+                    // Continue anyway - app will show connection error
+                } else {
+                    println!("✓ Backend started successfully on port {}", free_port);
+                }
+
+                (free_port, child)
+            };
+
+            // Store port and process in managed state
+            let backend_state: tauri::State<BackendState> = app.state();
+            *backend_state.port.lock().unwrap() = Some(port);
+            *backend_state.process.lock().unwrap() = child_process;
 
             // Clone handles for background thread
             let main_window_clone = main_window.clone();
@@ -352,20 +493,42 @@ fn main() {
 
             // Wait for backend server in background thread
             thread::spawn(move || {
-                println!("Waiting for backend server to be ready...");
-                if wait_for_server(30) {
-                    println!("Backend server is ready!");
+                // Give the backend a moment to start up before checking
+                println!("Giving backend 2 seconds to initialize...");
+                thread::sleep(Duration::from_secs(2));
+
+                println!("Waiting for backend server to be ready on port {}...", port);
+                if wait_for_server(port, 30) {
+                    println!("✓ Backend server is ready!");
                     // Show main window and close splash
                     main_window_clone.show().expect("Failed to show main window");
                     splash_window_clone.close().expect("Failed to close splash window");
                 } else {
-                    eprintln!("Backend server failed to start - showing main window anyway");
+                    eprintln!("✗ Backend server health check timed out - showing main window anyway");
+                    eprintln!("  (Backend may still be starting up and will work shortly)");
                     main_window_clone.show().expect("Failed to show main window");
                     splash_window_clone.close().expect("Failed to close splash window");
                 }
             });
 
             Ok(())
+        })
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { .. } = event {
+                // Kill the backend server when window closes
+                println!("Window close event - cleaning up backend...");
+                let app = window.app_handle();
+                let state: tauri::State<BackendState> = app.state();
+                let mut guard = state.process.lock().unwrap();
+                if let Some(child) = guard.take() {
+                    println!("Killing backend server on window close...");
+                    let _ = child.kill();
+                    println!("✓ Backend server terminated");
+                } else {
+                    println!("No backend process to terminate (may be manual mode)");
+                }
+                drop(guard);
+            }
         })
         .invoke_handler(tauri::generate_handler![
             select_files,
@@ -376,8 +539,25 @@ fn main() {
             select_model_files,
             save_file,
             write_file,
-            generate_unique_folder_name
+            generate_unique_folder_name,
+            get_backend_port
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app_handle, event| {
+            // Handle app-wide exit event to ensure backend cleanup
+            if let tauri::RunEvent::Exit = event {
+                println!("App exit event - cleaning up backend...");
+                let state: tauri::State<BackendState> = app_handle.state();
+                let mut guard = state.process.lock().unwrap();
+                if let Some(child) = guard.take() {
+                    println!("Killing backend server on app exit...");
+                    let _ = child.kill();
+                    println!("✓ Backend server terminated");
+                } else {
+                    println!("No backend process to terminate");
+                }
+                drop(guard);
+            }
+        });
 }

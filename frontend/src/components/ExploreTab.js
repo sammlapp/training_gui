@@ -4,6 +4,7 @@ import SpeciesMultiSelect from './SpeciesMultiSelect';
 import AudioClipCard from './AudioClipCard';
 import DisplaySettings from './DisplaySettings';
 import { selectCSVFiles } from '../utils/fileOperations';
+import { getBackendUrl } from '../utils/backendConfig';
 
 // Styled Material UI Slider with local color scheme
 const StyledSlider = styled(Slider)({
@@ -180,7 +181,8 @@ function ExploreTab() {
 
   const checkRowCount = async (filePath) => {
     try {
-      const response = await fetch('http://localhost:8000/files/count-rows', {
+      const backendUrl = await getBackendUrl();
+      const response = await fetch(`${backendUrl}/files/count-rows`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -206,12 +208,13 @@ function ExploreTab() {
     setError('');
 
     try {
+      const backendUrl = await getBackendUrl();
       const requestBody = { file_path: filePath };
       if (maxRows) {
         requestBody.max_rows = maxRows;
       }
 
-      const response = await fetch('http://localhost:8000/load_scores', {
+      const response = await fetch(`${backendUrl}/load_scores`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

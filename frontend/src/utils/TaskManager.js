@@ -5,6 +5,7 @@
 
 import { v4 as uuidv4 } from 'uuid';
 import { generateUniqueFolderName } from './fileOperations';
+import { getBackendUrl } from './backendConfig';
 
 export const TASK_STATUS = {
   UNSTARTED: 'unstarted',
@@ -207,6 +208,7 @@ class TaskManager {
 
   async runInference(task) {
     const config = task.config;
+    const backendUrl = await getBackendUrl();
 
     // Generate unique process ID for this task
     const processId = `task_${task.id}_${Date.now()}`;
@@ -251,7 +253,7 @@ class TaskManager {
       };
 
       // Save temporary config file using HTTP API
-      const saveResponse = await fetch('http://localhost:8000/config/save', {
+      const saveResponse = await fetch(`${backendUrl}/config/save`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -281,7 +283,7 @@ class TaskManager {
       this.updateTask(task.id, { progress: 'Running inference...' });
 
       // Start inference via HTTP API (now returns immediately with job ID)
-      const inferenceResponse = await fetch('http://localhost:8000/inference/run', {
+      const inferenceResponse = await fetch(`${backendUrl}/inference/run`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -300,7 +302,7 @@ class TaskManager {
         this.updateTask(task.id, { progress: 'Inference running...', processId: jobId });
 
         // Poll for completion
-        const finalResult = await this.pollInferenceStatus(jobId, task.id);
+        const finalResult = await this.pollInferenceStatus(jobId, task.id, backendUrl);
 
         if (finalResult.status === 'completed') {
           return {
@@ -341,18 +343,19 @@ class TaskManager {
     }
   }
 
-  async pollInferenceStatus(jobId, taskId, pollInterval = 2000) {
+  async pollInferenceStatus(jobId, taskId, backendUrl, pollInterval = 2000) {
     /**
      * Poll inference status until completion or failure
-     * @param {string} jobId - Backend job ID 
+     * @param {string} jobId - Backend job ID
      * @param {string} taskId - Frontend task ID
+     * @param {string} backendUrl - Backend server URL
      * @param {number} pollInterval - Polling interval in milliseconds
      * @returns {Promise} Final result when inference completes
      */
     return new Promise((resolve, reject) => {
       const poll = async () => {
         try {
-          const response = await fetch(`http://localhost:8000/inference/status/${jobId}`);
+          const response = await fetch(`${backendUrl}/inference/status/${jobId}`);
 
           if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -411,6 +414,7 @@ class TaskManager {
 
   async runTraining(task) {
     const config = task.config;
+    const backendUrl = await getBackendUrl();
 
     // Generate unique process ID for this task
     const processId = `training_${task.id}_${Date.now()}`;
@@ -454,7 +458,7 @@ class TaskManager {
       };
 
       // Save temporary config file using HTTP API
-      const saveResponse = await fetch('http://localhost:8000/config/save', {
+      const saveResponse = await fetch(`${backendUrl}/config/save`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -484,7 +488,7 @@ class TaskManager {
       this.updateTask(task.id, { progress: 'Starting training...' });
 
       // Start training via HTTP API (returns immediately with job ID)
-      const trainingResponse = await fetch('http://localhost:8000/training/run', {
+      const trainingResponse = await fetch(`${backendUrl}/training/run`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -503,7 +507,7 @@ class TaskManager {
         this.updateTask(task.id, { progress: 'Training running...', processId: jobId });
 
         // Poll for completion
-        const finalResult = await this.pollTrainingStatus(jobId, task.id);
+        const finalResult = await this.pollTrainingStatus(jobId, task.id, backendUrl);
 
         if (finalResult.status === 'completed') {
           return {
@@ -544,18 +548,19 @@ class TaskManager {
     }
   }
 
-  async pollTrainingStatus(jobId, taskId, pollInterval = 2000) {
+  async pollTrainingStatus(jobId, taskId, backendUrl, pollInterval = 2000) {
     /**
      * Poll training status until completion or failure
-     * @param {string} jobId - Backend job ID 
+     * @param {string} jobId - Backend job ID
      * @param {string} taskId - Frontend task ID
+     * @param {string} backendUrl - Backend server URL
      * @param {number} pollInterval - Polling interval in milliseconds
      * @returns {Promise} Final result when training completes
      */
     return new Promise((resolve, reject) => {
       const poll = async () => {
         try {
-          const response = await fetch(`http://localhost:8000/training/status/${jobId}`);
+          const response = await fetch(`${backendUrl}/training/status/${jobId}`);
 
           if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -612,6 +617,7 @@ class TaskManager {
 
   async runExtraction(task) {
     const config = task.config;
+    const backendUrl = await getBackendUrl();
 
     // Generate unique process ID for this task
     const processId = `extraction_${task.id}_${Date.now()}`;
@@ -647,7 +653,7 @@ class TaskManager {
       };
 
       // Save temporary config file using HTTP API
-      const saveResponse = await fetch('http://localhost:8000/config/save', {
+      const saveResponse = await fetch(`${backendUrl}/config/save`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -677,7 +683,7 @@ class TaskManager {
       this.updateTask(task.id, { progress: 'Creating annotation task...' });
 
       // Start annotation via HTTP API (returns immediately with job ID)
-      const extractionResponse = await fetch('http://localhost:8000/extraction/run', {
+      const extractionResponse = await fetch(`${backendUrl}/extraction/run`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -696,7 +702,7 @@ class TaskManager {
         this.updateTask(task.id, { progress: 'Clip selection task running...', processId: jobId });
 
         // Poll for completion
-        const finalResult = await this.pollExtractionStatus(jobId, task.id);
+        const finalResult = await this.pollExtractionStatus(jobId, task.id, backendUrl);
 
         if (finalResult.status === 'completed') {
           return {
@@ -737,18 +743,19 @@ class TaskManager {
     }
   }
 
-  async pollExtractionStatus(jobId, taskId, pollInterval = 2000) {
+  async pollExtractionStatus(jobId, taskId, backendUrl, pollInterval = 2000) {
     /**
      * Poll extraction status until completion or failure
-     * @param {string} jobId - Backend job ID 
+     * @param {string} jobId - Backend job ID
      * @param {string} taskId - Frontend task ID
+     * @param {string} backendUrl - Backend server URL
      * @param {number} pollInterval - Polling interval in milliseconds
      * @returns {Promise} Final result when extraction completes
      */
     return new Promise((resolve, reject) => {
       const poll = async () => {
         try {
-          const response = await fetch(`http://localhost:8000/extraction/status/${jobId}`);
+          const response = await fetch(`${backendUrl}/extraction/status/${jobId}`);
 
           if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -807,17 +814,19 @@ class TaskManager {
     const task = this.getTask(taskId);
     if (!task) return false;
 
+    const backendUrl = await getBackendUrl();
+
     if (task.status === TASK_STATUS.RUNNING) {
       // Cancel the running process via backend API
       if (task.processId) {
         try {
           let endpoint;
           if (task.type === TASK_TYPE.TRAINING) {
-            endpoint = `http://localhost:8000/training/cancel/${task.processId}`;
+            endpoint = `${backendUrl}/training/cancel/${task.processId}`;
           } else if (task.type === TASK_TYPE.EXTRACTION) {
-            endpoint = `http://localhost:8000/extraction/cancel/${task.processId}`;
+            endpoint = `${backendUrl}/extraction/cancel/${task.processId}`;
           } else {
-            endpoint = `http://localhost:8000/inference/cancel/${task.processId}`;
+            endpoint = `${backendUrl}/inference/cancel/${task.processId}`;
           }
 
           const response = await fetch(endpoint, {

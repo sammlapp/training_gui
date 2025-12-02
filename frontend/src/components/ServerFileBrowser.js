@@ -31,6 +31,7 @@ import FolderIcon from '@mui/icons-material/Folder';
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 import HomeIcon from '@mui/icons-material/Home';
 import SearchIcon from '@mui/icons-material/Search';
+import { getBackendUrl } from '../utils/backendConfig';
 
 /**
  * ServerFileBrowser Component
@@ -66,7 +67,8 @@ const ServerFileBrowser = ({
     setLoading(true);
     setSearchText(''); // Clear search when navigating
     try {
-      const response = await fetch('http://localhost:8000/files/browse', {
+      const backendUrl = await getBackendUrl();
+      const response = await fetch(`${backendUrl}/files/browse`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ path: path || '' })

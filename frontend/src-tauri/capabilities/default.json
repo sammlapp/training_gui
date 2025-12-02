@@ -1,0 +1,15 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "identifier": "default",
+  "description": "Default capabilities for Dipper app",
+  "windows": ["main", "splash"],
+  "permissions": [
+    "core:default",
+    "core:webview:allow-internal-toggle-devtools",
+    "core:window:default",
+    "dialog:default",
+    "fs:default",
+    "http:default",
+    "shell:default"
+  ]
+}

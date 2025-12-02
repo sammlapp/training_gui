@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { getBackendUrl } from '../utils/backendConfig';
 
 function AudioClipCard({
   clipData,
@@ -80,7 +81,7 @@ function AudioClipCard({
       };
 
       // Use HTTP backend (works in both Electron and browser)
-      const serverUrl = 'http://localhost:8000';
+      const serverUrl = await getBackendUrl();
 
       // Build query parameters
       const params = new URLSearchParams({

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { FormControl, Select, MenuItem } from '@mui/material';
 import HelpIcon from './HelpIcon';
 import { selectCSVFiles, selectFolder, saveFile, selectJSONFiles } from '../utils/fileOperations';
+import { getBackendUrl } from '../utils/backendConfig';
 
 // Default values for training form
 const DEFAULT_VALUES = {
@@ -73,8 +74,8 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
 
       console.log('Selected file:', filePath);
 
-
-      const response = await fetch('http://localhost:8000/files/get-csv-columns', {
+      const backendUrl = await getBackendUrl();
+      const response = await fetch(`${backendUrl}/files/get-csv-columns`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -333,7 +334,8 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
           }
         };
 
-        const response = await fetch('http://localhost:8000/config/save', {
+        const backendUrl = await getBackendUrl();
+        const response = await fetch(`${backendUrl}/config/save`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -360,7 +362,8 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
     try {
       const configFile = await selectJSONFiles();
       if (configFile && configFile.length > 0) {
-        const response = await fetch('http://localhost:8000/config/load', {
+        const backendUrl = await getBackendUrl();
+        const response = await fetch(`${backendUrl}/config/load`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

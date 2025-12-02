@@ -27,6 +27,7 @@ import TrainingTaskCreationForm from './components/TrainingTaskCreationForm';
 import ExtractionTaskCreationForm from './components/ExtractionTaskCreationForm';
 import TaskMonitor from './components/TaskMonitor';
 import taskManager from './utils/TaskManager';
+import { useBackendUrl } from './hooks/useBackendUrl';
 
 const drawerWidth = 240;
 
@@ -96,6 +97,7 @@ function App() {
   const [activeTab, setActiveTab] = useState(isReviewOnly ? 'review' : 'inference');
   const [currentTask, setCurrentTask] = useState(null);
   const [taskHistory, setTaskHistory] = useState([]);
+  const backendUrl = useBackendUrl();
 
   const tabs = [
     { id: 'inference', name: 'Inference', icon: <PlayArrowIcon /> },
@@ -363,6 +365,9 @@ function App() {
                   • {taskHistory.filter(t => t.status === 'queued').length} queued
                 </span>
               )}
+              <span className="server-status">
+                • Backend: {backendUrl.replace('http://localhost:', 'port ')}
+              </span>
             </div>
           )}
         </div>

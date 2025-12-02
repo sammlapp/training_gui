@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { FormControl, Select, MenuItem } from '@mui/material';
 import HelpIcon from './HelpIcon';
 import { selectFiles, selectFolder, selectTextFiles, selectModelFiles, saveFile, selectJSONFiles } from '../utils/fileOperations';
+import { getBackendUrl } from '../utils/backendConfig';
 
 // Default values for inference form
 const DEFAULT_VALUES = {
@@ -151,7 +152,8 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
 
   const countFilesFromPatterns = async (patterns) => {
     try {
-      const response = await fetch('http://localhost:8000/files/count-glob', {
+      const backendUrl = await getBackendUrl();
+      const response = await fetch(`${backendUrl}/files/count-glob`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -182,7 +184,8 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
 
   const countFilesFromList = async (filePath) => {
     try {
-      const response = await fetch('http://localhost:8000/files/count-list', {
+      const backendUrl = await getBackendUrl();
+      const response = await fetch(`${backendUrl}/files/count-list`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -332,7 +335,8 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
         };
 
         // Use HTTP API to save config
-        const response = await fetch('http://localhost:8000/config/save', {
+        const backendUrl = await getBackendUrl();
+        const response = await fetch(`${backendUrl}/config/save`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -360,7 +364,8 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
       const configFile = await selectJSONFiles();
       if (configFile && configFile.length > 0) {
         // Use HTTP API to load config
-        const response = await fetch('http://localhost:8000/config/load', {
+        const backendUrl = await getBackendUrl();
+        const response = await fetch(`${backendUrl}/config/load`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

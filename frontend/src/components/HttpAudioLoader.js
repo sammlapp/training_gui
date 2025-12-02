@@ -3,7 +3,7 @@ import { useState, useCallback } from 'react';
 /**
  * HTTP-based audio loader - 20x faster than IPC by using direct HTTP calls
  */
-export const useHttpAudioLoader = (serverUrl = 'http://localhost:8000') => {
+export const useHttpAudioLoader = (serverUrl) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [progress, setProgress] = useState(0);

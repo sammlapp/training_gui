@@ -48,6 +48,8 @@ AttributeError: 'Series' object has no attribute 'columns'
 ## next steps:
 server configuration and connection; test remote access; fix file save (create file) dialog
 
+lightweight_server backend not properly terminating when app terminates. Add a parent process listener in lightweight_server.py that will terminate the lightweight_server if the parent process disappears. Make sure the parent process ID is passed to lightweight_server regardless of how it is launched. 
+
 add alternative "view mode" for multi-class annotation: instead of a multi-select box, each class has a button that can be toggled for present/absent. Class buttons are floated in a wrapping div, such that multiple can appear side by side if there is enough horizontal space.
 
 select ports for lightweight_server (currently 3000) and react frontend/backend comm (currently 8000) dynamically and store as a variable or something that can be accessed in all necessary places, rather than hard-coding the port throughout the app. The app should still work properly when some other process is using port 3000 or 8000. Also ensure that the backend pyinstaller process (currently port 8000) closes when the app closes or is quit/killed. The lightweight server shouldn't keep running past the main app. 
@@ -60,20 +62,17 @@ test builds that allow inference and training
 
 get feedback on inference and training builds
 
-running on servers: port forwarding or otherwise providing a web-based gui where user can access Dipper running on a remote machine
-- no-electron version of app runs with just lightweight_server+react+rust locally
-- file selection/explorer with SVAR
-- need to be very careful with multi-user scenarios, sessions, what happens when more than one person using Dipper
-
 - PyInstaller build is likely overly complicated: I think we should be able to use other modules without the "sys.path.append" workarounds to find the modules. 
 
 - Review saving/loading annotation settings to json: includes view settings and CGL
 - CGL true/false should persist across app restart
 
-- stratification by arbitrary columns for clip extraction
+- stratification by arbitrary columns in metadata for clip extraction
 
 - delete archive file of pytorch env after unpacking
-- eventually will want to choose between pytorch envs depending on (1) operating system, (2) model being run
+- eventually will want to choose between pytorch envs depending on (1) operating system, (2) model being run (currently one env per OS and have only built mac)
+
+Review tab status bar: if we are in the full app (not review-only), the review status bar is covered by the global app status bar, it should be bumped up so that it is not hidden. 
 
 ## general feature request list 
 
