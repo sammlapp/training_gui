@@ -159,9 +159,13 @@ jobs:
         working-directory: frontend
         run: npm run build:review
 
+      - name: Check disk space (macOS)
+        if: startsWith(matrix.platform, 'macos')
+        run: df -h
+
       - name: Build Tauri app
         working-directory: frontend
-        run: npm run tauri:build:review
+        run: npm run tauri:build:review -- --verbose
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
@@ -179,6 +183,7 @@ jobs:
       - name: Upload macOS DMG
         if: startsWith(matrix.platform, 'macos')
         uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
           name: dipper-review-${{ matrix.platform }}-dmg
           path: frontend/src-tauri/target/release/bundle/dmg/*.dmg
