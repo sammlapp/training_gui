@@ -15,15 +15,17 @@ allow up to N background tasks to run in parallel if user clicks run in parallel
 
 ## known bugs
 
+backend lightweight_server does not terminate on app termination
 cannot ctrl/cmd+c/v in the app 
 
 Multi-class review mode segmented control still has ugly styling, update to match Binary review segmented annotation control
 
 When using remote file explorer, "save" dialogue is incorrect - cannot create file
 
-Sometimes does not render specs on the page (bin) when enabling classifier guided listening (CGL)
+Review tab: 
+When the layout number of columns/rows is changed, the active clip changes. Instead, the page should update so that the previously active clip is still on the displayed page, and is still the active clip. 
+Sometimes the review tab does not render specs on the page (bin) when enabling or changing settings of classifier guided listening (CGL). They only render on page change. We should ensure that any clips displayed in the current page/bin get rendered immediately 
 
-Tauri build not rendering Review tab clips correctly
 
 Need to test training (failed, fixed bug in script, didn't try again)
 
@@ -53,7 +55,6 @@ server configuration and connection; test remote access; fix file save (create f
 lightweight_server backend not properly terminating when app terminates. Add a parent process listener in lightweight_server.py that will terminate the lightweight_server if the parent process disappears. Make sure the parent process ID is passed to lightweight_server regardless of how it is launched. 
 
 Save view + CGL settings in config file alongside annotation csv. Load settings from config file if found when opening the annotation csv
-
 
 test inference with custom/local models
 

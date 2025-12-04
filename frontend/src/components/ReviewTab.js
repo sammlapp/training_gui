@@ -15,6 +15,7 @@ import {
 } from '../utils/stratificationUtils';
 import { selectCSVFiles, selectFolder, saveFile, writeFile } from '../utils/fileOperations';
 import { useBackendUrl } from '../hooks/useBackendUrl';
+import { dirname, basename } from 'pathe';
 
 function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
   const backendUrl = useBackendUrl();
@@ -667,7 +668,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
       }
 
       // Set root audio path to directory containing the CSV file
-      const csvDirectory = filePath.substring(0, filePath.lastIndexOf('/'));
+      const csvDirectory = dirname(filePath);
       setRootAudioPath(csvDirectory);
       // Save to localStorage (keeping it with settings for now but will move it out)
       const newSettings = { ...currentSettings, root_audio_path: csvDirectory };
@@ -1935,7 +1936,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
               </button>
               {selectedFile && (
                 <span className="selected-file">
-                  Loaded: {selectedFile.split('/').pop()}
+                  Loaded: {basename(selectedFile)}
                 </span>
               )}
               {annotationData.length > 0 && (
@@ -2475,7 +2476,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
             <button
               onClick={handleSave}
               className="toolbar-btn"
-              title={currentSavePath ? `Save to ${currentSavePath.split('/').pop()}` : "Save (will open save dialog)"}
+              title={currentSavePath ? `Save to ${basename(currentSavePath)}` : "Save (will open save dialog)"}
               disabled={annotationData.length === 0}
             >
               <span className="material-symbols-outlined">save</span>

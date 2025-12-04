@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { basename } from 'pathe';
 import { FormControl, Select, MenuItem } from '@mui/material';
 import HelpIcon from './HelpIcon';
 import { selectFiles, selectFolder, selectTextFiles, selectModelFiles, saveFile, selectJSONFiles } from '../utils/fileOperations';
@@ -349,7 +350,7 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
 
         const result = await response.json();
         if (result.status === 'success') {
-          console.log(`Config saved to: ${configPath.split('/').pop()}`);
+          console.log(`Config saved to: ${basename(configPath)}`);
         } else {
           console.error(`Failed to save config: ${result.error}`);
         }
@@ -413,7 +414,7 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
             await countFilesFromList(configData.file_list);
           }
 
-          console.log(`Config loaded from: ${configFile[0].split('/').pop()}`);
+          console.log(`Config loaded from: ${basename(configFile[0])}`);
         } else {
           console.error(`Failed to load config: ${result.error}`);
         }
@@ -626,7 +627,7 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
                 {config.file_list && (
                   <div>
                     <span className="selected-path">
-                      {config.file_list.split('/').pop()}
+                      {basename(config.file_list)}
                     </span>
                     <span className="file-count">
                       {fileCount} files listed
@@ -642,7 +643,7 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
                 Total files: <strong>{fileCount}</strong>
                 {firstFile && (
                   <div style={{ marginTop: '4px', fontSize: '0.9em', color: '#666' }}>
-                    First file: {firstFile.split('/').pop()}
+                    First file: {basename(firstFile)}
                   </div>
                 )}
               </div>
@@ -749,7 +750,7 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
               </div>
               {config.model && (
                 <span className="selected-path">
-                  {config.model.split('/').pop()}
+                  {basename(config.model)}
                 </span>
               )}
             </div>

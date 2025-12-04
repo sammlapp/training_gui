@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { basename } from 'pathe';
 import { FormControl, Select, MenuItem } from '@mui/material';
 import HelpIcon from './HelpIcon';
 import { selectCSVFiles, selectFolder, saveFile, selectJSONFiles } from '../utils/fileOperations';
@@ -348,7 +349,7 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
 
         const result = await response.json();
         if (result.status === 'success') {
-          console.log(`Training config saved to: ${configPath.split('/').pop()}`);
+          console.log(`Training config saved to: ${basename(configPath)}`);
         } else {
           console.error(`Failed to save config: ${result.error}`);
         }
@@ -407,7 +408,7 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
             subset_size: configData.testing_mode?.subset_size || 10
           }));
 
-          console.log(`Training config loaded from: ${configFile[0].split('/').pop()}`);
+          console.log(`Training config loaded from: ${basename(configFile[0])}`);
         } else {
           console.error(`Failed to load config: ${result.error}`);
         }
@@ -476,7 +477,7 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
                 <div className="file-list">
                   {config.fully_annotated_files.map((file, index) => (
                     <div key={index} className="file-item">
-                      {file.split('/').pop()}
+                      {basename(file)}
                     </div>
                   ))}
                 </div>
@@ -513,7 +514,7 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
               <div className="single-class-annotations">
                 {singleClassAnnotations.map((item, index) => (
                   <div key={index} className="annotation-item">
-                    <span className="file-name">{item.file.split('/').pop()}</span>
+                    <span className="file-name">{basename(item.file)}</span>
                     <FormControl size="small" sx={{ minWidth: 150 }}>
                       <Select
                         value={item.class}
@@ -582,7 +583,7 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
             </div>
             {config.background_samples_file && (
               <span className="selected-path">
-                {config.background_samples_file.split('/').pop()}
+                {basename(config.background_samples_file)}
               </span>
             )}
           </div>
@@ -640,7 +641,7 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
             </div>
             {config.evaluation_file && (
               <span className="selected-path">
-                {config.evaluation_file.split('/').pop()}
+                {basename(config.evaluation_file)}
               </span>
             )}
           </div>

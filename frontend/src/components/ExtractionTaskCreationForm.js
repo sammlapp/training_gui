@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { basename } from 'pathe';
 import Select from 'react-select';
 import HelpIcon from './HelpIcon';
 import { selectFolder, saveFile, selectJSONFiles } from '../utils/fileOperations';
@@ -201,7 +202,7 @@ function ExtractionTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
 
         const result = await response.json();
         if (result.status === 'success') {
-          console.log(`Extraction config saved to: ${configPath.split('/').pop()}`);
+          console.log(`Extraction config saved to: ${basename(configPath)}`);
         } else {
           console.error(`Failed to save config: ${result.error}`);
         }
@@ -249,7 +250,7 @@ function ExtractionTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
             await scanPredictionsFolder(configData.predictions_folder);
           }
 
-          console.log(`Extraction config loaded from: ${configFile[0].split('/').pop()}`);
+          console.log(`Extraction config loaded from: ${basename(configFile[0])}`);
         } else {
           console.error(`Failed to load config: ${result.error}`);
         }

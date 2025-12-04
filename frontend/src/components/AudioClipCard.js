@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { basename } from 'pathe';
 import { getBackendUrl } from '../utils/backendConfig';
 
 function AudioClipCard({
@@ -261,7 +262,7 @@ function AudioClipCard({
         {/* Basic info */}
         <div className="clip-info">
           <div className="file-name">
-            {file_path ? file_path.split('/').pop() : 'Unknown file'}
+            {file_path ? basename(file_path) : 'Unknown file'}
           </div>
           <div className="time-range">
             {start_time !== undefined && end_time !== undefined

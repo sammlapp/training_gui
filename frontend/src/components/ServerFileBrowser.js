@@ -82,8 +82,8 @@ const ServerFileBrowser = ({
       const result = await response.json();
       setCurrentPath(result.path);
 
-      // Parse path for breadcrumbs
-      const parts = result.path.split('/').filter(p => p);
+      // Parse path for breadcrumbs (handle both Unix / and Windows \ separators)
+      const parts = result.path.split(/[\\/]/).filter(p => p);
       setPathParts(parts);
 
       // Filter files by extension if filters provided

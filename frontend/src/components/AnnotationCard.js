@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef, memo } from 'react';
+import { basename } from 'pathe';
 import Select from 'react-select';
 // import { useRenderProfiler } from './PerformanceProfiler';
 
@@ -583,7 +584,7 @@ const AnnotationCard = memo(function AnnotationCard({
         {showFileName && (
           <div className="file-info">
             <div className="file-name" title={file}>
-              {file ? file.split('/').pop() : 'Unknown file'}
+              {file ? basename(file) : 'Unknown file'}
             </div>
             <div className="time-info">
               {start_time !== undefined && (

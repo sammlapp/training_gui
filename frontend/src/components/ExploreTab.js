@@ -1,5 +1,6 @@
 import { useState, useRef, useMemo, useCallback, useEffect } from 'react';
 import { Slider, styled } from '@mui/material';
+import { basename } from 'pathe';
 import SpeciesMultiSelect from './SpeciesMultiSelect';
 import AudioClipCard from './AudioClipCard';
 import DisplaySettings from './DisplaySettings';
@@ -677,7 +678,7 @@ function ExploreTab() {
           </button>
           {selectedFile && (
             <span className="selected-file">
-              Loaded: {selectedFile.split('/').pop()}
+              Loaded: {basename(selectedFile)}
             </span>
           )}
         </div>

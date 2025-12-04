@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { basename } from 'pathe';
 import Select from 'react-select';
 
 function FocusView({
@@ -584,7 +585,7 @@ function FocusView({
 
           {/* File info row */}
           <div className="focus-info-row">
-            <div className="focus-file-name">{file ? file.split('/').pop() : 'Unknown file'}</div>
+            <div className="focus-file-name">{file ? basename(file) : 'Unknown file'}</div>
             <div className="focus-time-info">
               {start_time !== undefined && (
                 <span>{start_time.toFixed(1)}s</span>
