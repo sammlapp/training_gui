@@ -2,14 +2,11 @@ name: Build Full App
 
 on:
   push:
-    branches: [ main, develop ]
+    # branches: [ main, develop ]
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+'  # Only version tags without suffix (e.g., v0.0.6)
-      - 'v[0-9]+.[0-9]+.[0-9]+-alpha*'  # Alpha releases
-      - 'v[0-9]+.[0-9]+.[0-9]+-beta*'   # Beta releases
-      - 'v[0-9]+.[0-9]+.[0-9]+-rc*'     # Release candidates
-  pull_request:
-    branches: [ main ]
+  # pull_request:
+  #   branches: [ main ]
   workflow_dispatch:
 
 jobs:

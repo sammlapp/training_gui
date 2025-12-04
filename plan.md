@@ -48,13 +48,12 @@ AttributeError: 'Series' object has no attribute 'columns'
 ## next steps:
 server configuration and connection; test remote access; fix file save (create file) dialog
 
+- CGL true/false should persist across app restart
+
 lightweight_server backend not properly terminating when app terminates. Add a parent process listener in lightweight_server.py that will terminate the lightweight_server if the parent process disappears. Make sure the parent process ID is passed to lightweight_server regardless of how it is launched. 
 
-add alternative "view mode" for multi-class annotation: instead of a multi-select box, each class has a button that can be toggled for present/absent. Class buttons are floated in a wrapping div, such that multiple can appear side by side if there is enough horizontal space.
+Save view + CGL settings in config file alongside annotation csv. Load settings from config file if found when opening the annotation csv
 
-select ports for lightweight_server (currently 3000) and react frontend/backend comm (currently 8000) dynamically and store as a variable or something that can be accessed in all necessary places, rather than hard-coding the port throughout the app. The app should still work properly when some other process is using port 3000 or 8000. Also ensure that the backend pyinstaller process (currently port 8000) closes when the app closes or is quit/killed. The lightweight server shouldn't keep running past the main app. 
-
-separate HopLite Database-oriented embed, train, and predict into its own app
 
 test inference with custom/local models
 
@@ -62,25 +61,22 @@ test builds that allow inference and training
 
 get feedback on inference and training builds
 
+add alternative "view mode" for multi-class annotation: instead of a multi-select box, each class has a button that can be toggled for present/absent. Class buttons are floated in a wrapping div, such that multiple can appear side by side if there is enough horizontal space and vertical space is added to the clip panel if needed to display all options. 
+
 - PyInstaller build is likely overly complicated: I think we should be able to use other modules without the "sys.path.append" workarounds to find the modules. 
 
 - Review saving/loading annotation settings to json: includes view settings and CGL
-- CGL true/false should persist across app restart
+
 
 - stratification by arbitrary columns in metadata for clip extraction
 
 - delete archive file of pytorch env after unpacking
-- eventually will want to choose between pytorch envs depending on (1) operating system, (2) model being run (currently one env per OS and have only built mac)
+
+- download the correct pytorch .tar.gz conda-pack env based on the operating system
 
 Review tab status bar: if we are in the full app (not review-only), the review status bar is covered by the global app status bar, it should be bumped up so that it is not hidden. 
 
-Work on setting up the Github based cross platform build: apple silicon, apple intel, windows, linux
-- builds pyinstaller lightweight_server executable for the os (currently npm run build:python-pyinstaller)
-- builds the tauri desktop executable app for the os (currently npm run tauri:build or tauri:build:review)
-- separate Github workflows/actions for review-only and full app
-- full app: also creates the dipper-pytorch-env environment with conda-pack (app downloads this env as needed)
-
-Me: add github "secrets" set up for signing Mac app
+separate HopLite Database-oriented embed, train, and predict into its own app
 
 ## general feature request list 
 
@@ -140,13 +136,6 @@ within this project, create a separate deployable/buildable version of the app t
 
 - the offset of main content vs top menu bar isn't working correctly. When the window is narrow the menu bar will wrap around and become larger, causing it to cover the top of the main content. The main content should simply always be below the menu bar. It seems like there should be a simpler way to do this than trying to calculate the expected height of the menu bar, by placing the element below the menu bar instead of behind it. 
 
-## Training with hoplite
-I implemented training with hoplite in opso branch
-Now can have a script that
-- selects hoplite db and embedding model
-- ingests various training/val sets with single target or multi-target labels
-- embeds any training/val sets as necessary
-
 ## rewind
 - throughout the application, when providing click-to-play spectrograms, make it so that clicking on the left 20% of the spectrogram rewinds the clip to the beginning instead of performing the play/pause action. Show a rewind icon when hovering over the left 20% of the spectrogram. 
 
@@ -155,10 +144,8 @@ Now can have a script that
 - replace native filesystem / other native system interactions with text fields or other working alternatives
 - avoid system alerts/dialogues, which won't work
 - add Global Settings page with option to switch between remote and desktop versions
-- make sure none of the other features depend on electron
 - provide instructions for port forwarding to access the gui on a web browser
 - launch from CLI with argument for HTTP forwarding port
-- will need to refactor the backend: in desktop mode, use electronAPI, in remote server mode, use aiohttp or something for the API calls; extract shared functionality between the two modes to separate functions to avoid redundancy. Or write in a way that works for both. 
 - Streamlit has some nice backend support for multiple users using the same hosted app, but ours will not. Think carefully about what would happen if multiple users used the app on a multi-user machine. This gets quite a bit more complicated. Probably want to launch a separate instance of the app for each user/session and prevent multiple users from using the same session. 
 - would be huge if task management can be integrated across users; eg what if two people run the app on the same server, should have a central task management system and run jobs sequentially
 
@@ -166,7 +153,7 @@ alternatively, could run backend on remote, run frontend locally, connect to bac
 
 ### Training wishlist
 - convert Raven annotations to training data
-- create labels from subfolder structure (wrote this in a python notebook)
+- create single-target labels from subfolder structure (wrote this in a python notebook)
 - Weldy style noise augmentation (wrote this in a python notebook)
 - preprocessing "wizard": started notebook for prototype
 
@@ -174,39 +161,35 @@ alternatively, could run backend on remote, run frontend locally, connect to bac
 add toggle in inference script to embed instead or in addition to classification
 
 ## HOPLITE embedding and shallow classification 
+Separate app for hoplite embedding workflow
 (eventually add Query also)
 
- I have implemented functionalities for "embed audio to database" (mode='embed_to_hoplite') and "apply shallow classifier" (mode="classify_from_hoplite") modes in the inference.py script. We need to expose these functionalities to the user on the front end. In the Inference tab, we need to toggle between "End-toEnd Classification", "Embed to Database", and "Apply Shallow Classifier to Embedding DB" modes with a multi-select. Some of the inference paramters will be exposed depending on this selection.
-End-toEnd Classification: 
-- shows the current fields "Save sparse outputs" (checkbox) and "Separate inference by subfolders"
-- model selection is same as current (bmz model or local model)
-Embed to Database:
+I have implemented functionalities for "embed audio to database" (mode='embed_to_hoplite') and "apply shallow classifier" (mode="classify_from_hoplite") modes in the inference.py script. We need to expose these functionalities to the user on the front end. Embed tab: similar form to Inference tab, runs inference.py with mode='embed_to_hoplite'. 
 - instead of Save sparse outputs and Separate inference by subfolders fields, shows multi-select for database selection: 
 - Create New Hoplite Database (user selects parent folder and enters name of new db in a text field)
 - Add embeddings to existing Hoplite Database (user selects an existing folder; system confirms that "hoplite.sqlite" file exists in the folder)
-and shows a text field for 'dataset name' 
-- model selection is same as current (bmz model or local model)
-Apply Shallow Classifier to Embedding DB:
-- user selects a folder containing the HopLite Embedding DB
-- user selects a shallow classification model file (extension: .mlp)
-- also shows the current fields "Save sparse outputs" (checkbox) and "Separate inference by subfolders"
+-  User selects the embedding model from BMZ or local file path
+- form has controls for batch size, num workers, and optionally specifying a custom python environment
+- embedding script should write a dipper config file into the database folder, specifying the model and settings used for creating the embedding database
 
+Predict tab: user selects an existing hoplite database (a folder) and an existing shallow classifier (from file). Besides this there are just some configuration options (borrow from Inference tab) for batch size, activation layer, save sparse outputs, separate by subfolder, and test run on a few clips. Runs inference.py with mode="clasify_from_hoplite" in config. 
 
+Train tab: I need to write backend script
+User selects hoplite database (folder) and annotation files. Same configuration settings/form as training in full app for selecting train/val sets with single and multi-target labels
+- loads the dipper config file from the embedding database folder
+- embeds any training/val sets as necessary
 
-Otherwise, the task creation form remains the same. When Embed to database is selected in the multi-select, a different 
+Review tab: same as review tab for full app. 
 
+Query tab: I need to write backend script that embeds the query clips and runs search across db
 
-## updates for review tab
-consolidate the global theming options into a simple config or css file, so that I can make edits to the set of colors, fonts, font weights, font sizes, overall spacing values in one place for the entire app. 
 
 ## conda-pack updates:
 - if on linux or mac, include ai-edge-litert as a dependency and allow BirdNET use in the inference gui
-
 inference issue: BirdSet model not producing outputs if clips are <5 seconds
 
 ## inference tab updates:
 - app should download the appropriate env for inference if needed. tell user its downloading and will be saved for future use
-
 - checkbox for 'Separate inference by subfolders'
 
 ### add process ID tracking to reconnect with running process across app close/restart
@@ -231,14 +214,6 @@ The running task continues when the app quits.
 
 ## Annotation task creation panel Improvements:
 - Review tab binary classification: check box in settings to show f"Score : {row['score']:0.2f}" in the clip display panel (just below audio file display position)
-
-## Classifier-guided listening
-annotation pane: if using early stopping mode:
-- annotation csv has column for 'group name': combines any stratification eg by date window, point name
-- create a state variable tracking group_name:status, where status is (a) 'unverified candidate detection' (>=1 clips in group, no verified detections, >=1 unannotated or uncertain clips), (b) 'verified detection' (>=1 yes annotation), (c) 'verified non-detection' (all clips in group labeled no), or (d) 'no candidate detection'. 
-- filter to clips in groups with status 'unverified candidate detection'
-- order clips by group
-- display group in clip panel
 
 ## inference tab updates:
 for completed tasks, add a button to create an annotation task
