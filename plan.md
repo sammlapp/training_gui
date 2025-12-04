@@ -16,9 +16,8 @@ allow up to N background tasks to run in parallel if user clicks run in parallel
 ## known bugs
 
 backend lightweight_server does not terminate on app termination
-cannot ctrl/cmd+c/v in the app 
 
-Multi-class review mode segmented control still has ugly styling, update to match Binary review segmented annotation control
+cannot ctrl/cmd+c/v in the app 
 
 When using remote file explorer, "save" dialogue is incorrect - cannot create file
 

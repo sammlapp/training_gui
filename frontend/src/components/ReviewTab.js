@@ -55,6 +55,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
   const activeClipAudioControlsRef = useRef(null); // Ref to store active clip's audio control functions {togglePlayPause, pause, play}
   const previousClipAudioControlsRef = useRef(null); // Ref to store previous clip's audio controls for pausing
   const shouldAutoplayNextClip = useRef(false); // Flag to trigger autoplay after annotation
+  const isLayoutChanging = useRef(false); // Flag to prevent active clip reset during layout changes
   const [gridModeAutoplay, setGridModeAutoplay] = useState(false); // Auto-play in grid mode when active clip advances
   const [isLeftTrayOpen, setIsLeftTrayOpen] = useState(false);
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
@@ -108,13 +109,46 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
   };
 
   const handleSettingsChange = (newSettings) => {
+    // Calculate current active clip's absolute index before layout changes
+    const oldItemsPerPage = settings.grid_rows * settings.grid_columns;
+    const absoluteActiveIndex = currentPage * oldItemsPerPage + activeClipIndexOnPage;
+
     setSettings(newSettings);
 
-    // If grid size changed, adjust current page to stay in bounds
+    // If grid size changed, recalculate page and position to preserve active clip
     const newItemsPerPage = newSettings.grid_rows * newSettings.grid_columns;
-    const newTotalPages = Math.ceil(annotationData.length / newItemsPerPage);
-    if (currentPage >= newTotalPages && newTotalPages > 0) {
-      setCurrentPage(newTotalPages - 1);
+    const layoutChanged = (newSettings.grid_rows !== settings.grid_rows ||
+                          newSettings.grid_columns !== settings.grid_columns);
+
+    if (layoutChanged && annotationData.length > 0) {
+      // Set flag to prevent page-change useEffect from resetting active clip
+      isLayoutChanging.current = true;
+
+      // Calculate which page and position the active clip should be at in new layout
+      const newPage = Math.floor(absoluteActiveIndex / newItemsPerPage);
+      const newActiveClipIndex = absoluteActiveIndex % newItemsPerPage;
+
+      // Update page if it changed
+      const newTotalPages = Math.ceil(annotationData.length / newItemsPerPage);
+      const boundedNewPage = Math.min(newPage, newTotalPages - 1);
+
+      if (boundedNewPage !== currentPage) {
+        setCurrentPage(boundedNewPage);
+      }
+
+      // Update active clip index for new layout
+      setActiveClipIndexOnPage(newActiveClipIndex);
+
+      // Clear flag after state updates complete
+      setTimeout(() => {
+        isLayoutChanging.current = false;
+      }, 0);
+    } else {
+      // No layout change, just ensure current page is in bounds
+      const newTotalPages = Math.ceil(annotationData.length / newItemsPerPage);
+      if (currentPage >= newTotalPages && newTotalPages > 0) {
+        setCurrentPage(newTotalPages - 1);
+      }
     }
 
     // Re-extract classes if review mode changed
@@ -388,11 +422,13 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
     if (annotationData.length > 0) {
       loadCurrentPageSpectrograms();
     }
-  }, [currentPage, currentBinIndex, currentDataVersion, rootAudioPath, filteredAnnotationData.length, settings.grid_rows, settings.grid_columns, classifierGuidedMode.enabled, isFocusMode]);
+  }, [currentPage, currentBinIndex, currentDataVersion, rootAudioPath, filteredAnnotationData.length, settings.grid_rows, settings.grid_columns, classifierGuidedMode.enabled, stratifiedBins.length, isFocusMode]);
 
-  // Reset active clip to first clip when page or bin changes
+  // Reset active clip to first clip when page or bin changes (unless it's a layout change)
   useEffect(() => {
-    setActiveClipIndexOnPage(0);
+    if (!isLayoutChanging.current) {
+      setActiveClipIndexOnPage(0);
+    }
   }, [currentPage, currentBinIndex]);
 
   // Sync focus clip index with active clip when entering focus mode

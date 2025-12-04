@@ -273,13 +273,13 @@ const AnnotationCard = memo(function AnnotationCard({
   // Auto-load spectrogram when props change (proper implementation)
   useEffect(() => {
     const currentKey = `${file}:${start_time}`;
-    
+
     // Only proceed if we should auto-load and haven't tried this combination before
-    if (!disableAutoLoad && file && start_time !== undefined && 
-        lastLoadedRef.current !== currentKey && !spectrogram_base64) {
-      
+    if (!disableAutoLoad && file && start_time !== undefined &&
+      lastLoadedRef.current !== currentKey && !spectrogram_base64) {
+
       lastLoadedRef.current = currentKey;
-      
+
       // Create an async function inside useEffect to handle the loading
       const loadSpec = async () => {
         if (loadingRef.current) return;
@@ -310,7 +310,7 @@ const AnnotationCard = memo(function AnnotationCard({
             // Get current root audio path from localStorage
             const reviewSettings = localStorage.getItem('review_settings');
             const currentRootAudioPath = reviewSettings ? JSON.parse(reviewSettings).root_audio_path || '' : '';
-            
+
             let fullFilePath = file;
             if (currentRootAudioPath && !file.startsWith('/') && !file.match(/^[A-Za-z]:\\/)) {
               fullFilePath = `${currentRootAudioPath}/${file}`;
@@ -523,12 +523,12 @@ const AnnotationCard = memo(function AnnotationCard({
     // Only exclude actual interactive form controls
     const target = event.target;
     const isFormControl = target.tagName === 'BUTTON' ||
-                         target.tagName === 'INPUT' ||
-                         target.tagName === 'TEXTAREA' ||
-                         target.closest('button') ||
-                         target.closest('input') ||
-                         target.closest('textarea') ||
-                         target.closest('.react-select'); // Exclude react-select dropdowns
+      target.tagName === 'INPUT' ||
+      target.tagName === 'TEXTAREA' ||
+      target.closest('button') ||
+      target.closest('input') ||
+      target.closest('textarea') ||
+      target.closest('.react-select'); // Exclude react-select dropdowns
 
     if (!isFormControl && onCardClick) {
       onCardClick();
