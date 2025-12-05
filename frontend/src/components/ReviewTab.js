@@ -169,12 +169,23 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
           setClassifierGuidedMode(config.cgl_settings);
           saveConfigToLocalStorage(config);
 
-          // Force spectrogram re-render after state updates are applied
-          // Use setTimeout to ensure settings state has updated before reloading
-          setTimeout(() => {
-            setCurrentDataVersion(prev => prev + 1);
-            loadCurrentPageSpectrograms();
-          }, 100);
+          // Save visualization settings to localStorage so AudioClipCard can read them
+          const visualizationSettings = {
+            spec_window_size: config.view_settings.spec_window_size,
+            spectrogram_colormap: config.view_settings.spectrogram_colormap,
+            dB_range: config.view_settings.dB_range,
+            use_bandpass: config.view_settings.use_bandpass,
+            bandpass_range: config.view_settings.bandpass_range,
+            show_reference_frequency: config.view_settings.show_reference_frequency,
+            reference_frequency: config.view_settings.reference_frequency,
+            resize_images: config.view_settings.resize_images,
+            image_width: config.view_settings.image_width,
+            image_height: config.view_settings.image_height,
+          };
+          localStorage.setItem('visualization_settings', JSON.stringify(visualizationSettings));
+
+          // Force spectrogram re-render by calling loadCurrentPageSpectrograms
+          loadCurrentPageSpectrograms();
 
           console.log('Config loaded from:', filePath);
           return true;
