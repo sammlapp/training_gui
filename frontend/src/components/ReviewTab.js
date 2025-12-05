@@ -29,7 +29,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
     grid_rows: 3,
     grid_columns: 4,
     show_comments: false,
-    show_file_name: true,
+    show_file_name: false,
     show_binary_controls: true,
     resize_images: true,
     image_width: 400,

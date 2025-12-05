@@ -37,6 +37,9 @@ Extraction results in an error, somewhere we get a pd.Series instead of pd.DataF
            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 AttributeError: 'Series' object has no attribute 'columns'
 
+Windows shortcuts: ctrl+shift+K doesn't work for next unannotated clip, and ctrl+s doesn't work for save (applies the No label instead, which should be the S shortcut but not ctrl/cmd + S)
+
+
 ## next steps:
 
 Let's prepare to fix up server mode. First, remove outdated markdown documents, review and update
@@ -46,7 +49,6 @@ Let's prepare to fix up server mode. First, remove outdated markdown documents, 
   remote user.  
 server configuration and connection; test remote access; fix file save (create file) dialog
 
-Save view + CGL settings in config file alongside annotation csv. Load settings from config file if found when opening the annotation csv
 
 test inference with custom/local models
 
@@ -56,19 +58,18 @@ get feedback on inference and training builds
 
 add alternative "view mode" for multi-class annotation: instead of a multi-select box, each class has a button that can be toggled for present/absent. Class buttons are floated in a wrapping div, such that multiple can appear side by side if there is enough horizontal space and vertical space is added to the clip panel if needed to display all options. 
 
-- PyInstaller build is likely overly complicated: I think we should be able to use other modules without the "sys.path.append" workarounds to find the modules. 
+- PyInstaller build is likely overly complicated: I think we should be able to use other modules without the "sys.path.append" workarounds to find the modules.  [wip]
 
 - stratification by arbitrary columns in metadata for clip extraction
 
 - delete archive file of pytorch env after unpacking
-
 - download the correct pytorch .tar.gz conda-pack env based on the operating system
-
-Review tab status bar (review-status-bar): if we are in the full app (not review-only), the review status bar is covered by the global app status bar (status-bar). In this case it should be bumped up so that it is not hidden. 
 
 separate HopLite Database-oriented embed, train, and predict into its own app
 
 The splash screen displays on top of all other apps, which is annoying. If user navigates to another application the splash screen should not be displayed on top
+
+Tabs should persist in state when user navigates to another tab and back. Currently, the tab gets completely reset - for instance, if I'm working in the review tab then navigate to another tab and back, it goes back to the landing page. It should retain the full state of the currently displayed clips and display settings while the Dipper main app is running. The same is true for other tabs. 
 
 ## general feature request list 
 

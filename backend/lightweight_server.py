@@ -28,6 +28,11 @@ from PIL import Image
 import soundfile as sf
 from io import BytesIO
 
+from scripts import scan_folder
+from scripts import get_sample_detections
+from scripts import load_scores
+from scripts import create_extraction_task
+
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -56,6 +61,7 @@ def is_process_alive(pid):
         if system == "Windows":
             # On Windows, use tasklist command to check if process exists
             import ctypes
+
             kernel32 = ctypes.windll.kernel32
             PROCESS_QUERY_INFORMATION = 0x0400
             handle = kernel32.OpenProcess(PROCESS_QUERY_INFORMATION, 0, pid)
@@ -93,7 +99,9 @@ async def monitor_parent_process(parent_pid, shutdown_callback, check_interval=2
 
         is_alive = is_process_alive(parent_pid)
         if check_count <= 3:  # Log first few checks for debugging
-            logger.info(f"Parent process check #{check_count}: PID {parent_pid} alive={is_alive}")
+            logger.info(
+                f"Parent process check #{check_count}: PID {parent_pid} alive={is_alive}"
+            )
 
         if not is_alive:
             logger.warning(f"Parent process (PID {parent_pid}) is no longer alive!")
@@ -1318,12 +1326,8 @@ class LightweightServer:
             if not folder_path or not os.path.exists(folder_path):
                 raise ValueError("Invalid folder path")
 
-            # Import scan_folder script
-            sys.path.insert(0, _get_scripts_path())
-            import scan_folder as sf
-
             # Call scan function
-            result = sf.scan_folder_for_audio_files(folder_path)
+            result = scan_folder.scan_folder_for_audio_files(folder_path)
 
             return web.json_response(result)
 
@@ -1340,12 +1344,8 @@ class LightweightServer:
             score_range = data.get("score_range")
             num_samples = data.get("num_samples", 12)
 
-            # Import get_sample_detections script
-            sys.path.insert(0, _get_scripts_path())
-            import get_sample_detections as gsd
-
             # Call function
-            samples = gsd.get_sample_detections(
+            samples = get_sample_detections.get_sample_detections(
                 score_data, species, score_range, num_samples
             )
 
@@ -1365,12 +1365,8 @@ class LightweightServer:
             if not file_path or not os.path.exists(file_path):
                 raise ValueError("Invalid file path")
 
-            # Import load_scores script
-            sys.path.insert(0, _get_scripts_path())
-            import load_scores as ls
-
             # Call function with optional max_rows parameter
-            result = ls.load_scores(file_path, max_rows=max_rows)
+            result = load_scores.load_scores(file_path, max_rows=max_rows)
 
             return self.json_response_with_nan_handling(result)
 
@@ -1638,12 +1634,8 @@ class LightweightServer:
                     status=400,
                 )
 
-            # Import load_scores script
-            sys.path.insert(0, _get_scripts_path())
-            import load_scores as ls
-
             # Call row count function
-            row_count = ls.count_file_rows(file_path)
+            row_count = load_scores.count_file_rows(file_path)
 
             return web.json_response(
                 {"status": "success", "row_count": row_count, "file_path": file_path}
@@ -2193,12 +2185,8 @@ class LightweightServer:
                     {"error": "folder_path is required"}, status=400
                 )
 
-            # Import the extraction script functions
-            sys.path.insert(0, _get_scripts_path())
-            import create_extraction_task as cet
-
             # Call the scan function from the extraction script
-            result = cet.scan_predictions_folder(folder_path)
+            result = create_extraction_task.scan_predictions_folder(folder_path)
 
             return web.json_response({"status": "success", **result})
 
@@ -2619,7 +2607,7 @@ class LightweightServer:
                 "/mnt",
                 "/media",
                 "/Users",  # macOS
-                "/home",   # Linux
+                "/home",  # Linux
             ]
 
             # Check if path is under any allowed directory
@@ -2646,13 +2634,15 @@ class LightweightServer:
                 for entry in os.scandir(normalized_path):
                     try:
                         stat_info = entry.stat()
-                        items.append({
-                            "id": entry.path,
-                            "value": entry.name,
-                            "size": stat_info.st_size if entry.is_file() else 0,
-                            "date": int(stat_info.st_mtime * 1000),  # milliseconds
-                            "type": "folder" if entry.is_dir() else "file",
-                        })
+                        items.append(
+                            {
+                                "id": entry.path,
+                                "value": entry.name,
+                                "size": stat_info.st_size if entry.is_file() else 0,
+                                "date": int(stat_info.st_mtime * 1000),  # milliseconds
+                                "type": "folder" if entry.is_dir() else "file",
+                            }
+                        )
                     except (OSError, PermissionError):
                         # Skip files/folders we can't access
                         continue
@@ -2661,14 +2651,9 @@ class LightweightServer:
                 items.sort(key=lambda x: (x["type"] != "folder", x["value"].lower()))
 
             except PermissionError:
-                return web.json_response(
-                    {"error": "Permission denied"}, status=403
-                )
+                return web.json_response({"error": "Permission denied"}, status=403)
 
-            return web.json_response({
-                "data": items,
-                "path": normalized_path
-            })
+            return web.json_response({"data": items, "path": normalized_path})
 
         except Exception as e:
             logger.error(f"Error browsing files: {e}")
@@ -2711,13 +2696,10 @@ class LightweightServer:
             os.makedirs(os.path.dirname(normalized_path), exist_ok=True)
 
             # Write file
-            with open(normalized_path, 'w', encoding='utf-8') as f:
+            with open(normalized_path, "w", encoding="utf-8") as f:
                 f.write(content)
 
-            return web.json_response({
-                "status": "success",
-                "path": normalized_path
-            })
+            return web.json_response({"status": "success", "path": normalized_path})
 
         except Exception as e:
             logger.error(f"Error saving file: {e}")
@@ -2749,9 +2731,7 @@ class LightweightServer:
                 unique_name = f"{folder_name}_{counter}"
                 counter += 1
 
-            return web.json_response({
-                "uniqueName": unique_name
-            })
+            return web.json_response({"uniqueName": unique_name})
 
         except Exception as e:
             logger.error(f"Error generating unique name: {e}")
@@ -2772,7 +2752,12 @@ class LightweightServer:
 def main():
     parser = argparse.ArgumentParser(description="Lightweight bioacoustics server")
     parser.add_argument("--port", type=int, default=8000, help="Port to run on")
-    parser.add_argument("--parent-pid", type=int, default=None, help="Parent process PID for heartbeat monitoring")
+    parser.add_argument(
+        "--parent-pid",
+        type=int,
+        default=None,
+        help="Parent process PID for heartbeat monitoring",
+    )
     parser.add_argument("--test", action="store_true", help="Run quick test and exit")
 
     args = parser.parse_args()
@@ -2798,7 +2783,9 @@ def main():
         # Get parent process ID for heartbeat monitoring
         # Use provided parent PID if available, otherwise use getppid()
         parent_pid = args.parent_pid if args.parent_pid else os.getppid()
-        logger.info(f"Server started with parent process PID: {parent_pid} (provided={args.parent_pid is not None})")
+        logger.info(
+            f"Server started with parent process PID: {parent_pid} (provided={args.parent_pid is not None})"
+        )
         logger.info(f"Server process PID: {os.getpid()}")
 
         # Create shutdown event for graceful termination
