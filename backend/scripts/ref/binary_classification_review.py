@@ -72,7 +72,7 @@ DEFAULT_SETTINGS = {
     "show_comment_field": False,
     "show_reference_frequency": False,
     "reference_frequency": 2000,  # Hz
-    "show_file_name": True,
+    "show_file_name": False,
     "enable_shortcuts": True,  # enable keyboard shortcuts
 }
 
