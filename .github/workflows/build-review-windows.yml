@@ -1,4 +1,4 @@
-name: Build Review-Only App
+name: Build Windows Review-Only App
 
 on:
   workflow_dispatch:
