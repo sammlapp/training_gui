@@ -2,7 +2,7 @@
  * Mode Detection Utility
  *
  * Detects whether the app is running in:
- * - LOCAL mode: Desktop app (Electron or Tauri)
+ * - LOCAL mode: Desktop app (Tauri)
  * - SERVER mode: Browser/web server deployment
  *
  * This allows the React app to adapt its behavior based on the deployment context.
@@ -18,9 +18,8 @@ export const AppMode = {
  *
  * Detection order:
  * 1. Explicit override via REACT_APP_MODE environment variable (build-time)
- * 2. Runtime detection of Tauri (window.__TAURI__)
- * 3. Runtime detection of Electron (user agent check)
- * 4. Default to SERVER mode if none of the above
+ * 2. Runtime detection of Tauri (window.__TAURI__ or window.__TAURI_INTERNALS__)
+ * 3. Default to SERVER mode if none of the above
  *
  * @returns {string} AppMode.LOCAL or AppMode.SERVER
  */
@@ -40,14 +39,7 @@ export const getAppMode = () => {
     return AppMode.LOCAL;
   }
 
-  // 3) Default heuristics
-  // - If running under Electron, treat as local until Electron is fully removed
-  //   (can be refined later using userAgent / preload flag)
-  // - Otherwise assume server/browser mode.
-  if (typeof window !== 'undefined' && /Electron/i.test(window.navigator.userAgent || '')) {
-    return AppMode.LOCAL;
-  }
-
+  // 3) Default to SERVER mode (browser/web deployment)
   return AppMode.SERVER;
 };
 

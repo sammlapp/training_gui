@@ -82,6 +82,27 @@ def create_virtual_env():
     return python_exe, pip_exe, pyinstaller_exe, venv_path
 
 
+def get_tauri_platform_name():
+    """Get the Tauri platform-specific binary name suffix"""
+    import platform
+
+    system = platform.system()
+    machine = platform.machine().lower()
+
+    if system == "Darwin":  # macOS
+        if machine in ["arm64", "aarch64"]:
+            return "aarch64-apple-darwin"
+        else:
+            return "x86_64-apple-darwin"
+    elif system == "Windows":
+        return "x86_64-pc-windows-msvc"
+    elif system == "Linux":
+        return "x86_64-unknown-linux-gnu"
+    else:
+        print(f"⚠️  Unknown platform: {system} {machine}")
+        return None
+
+
 def build_with_pyinstaller(pyinstaller_exe, venv_path):
     """Build executable with PyInstaller"""
     print("🔨 Building executable with PyInstaller...")
@@ -106,27 +127,48 @@ def build_with_pyinstaller(pyinstaller_exe, venv_path):
         description="Building with PyInstaller",
     )
 
-    # Copy to frontend directory
-    print("📁 Copying executable to frontend directory...")
-    if DIST_DIR.exists():
-        shutil.rmtree(DIST_DIR)
-    DIST_DIR.mkdir(parents=True, exist_ok=True)
-
-    # Copy lightweight server (handle both Unix and Windows)
+    # Determine source and destination paths
     if os.name == "nt":  # Windows
         source_dist = BACKEND_DIR / "dist" / "lightweight_server.exe"
-        dest_file = DIST_DIR / "lightweight_server.exe"
+        python_dist_file = DIST_DIR / "lightweight_server.exe"
     else:  # Unix-like
         source_dist = BACKEND_DIR / "dist" / "lightweight_server"
-        dest_file = DIST_DIR / "lightweight_server"
+        python_dist_file = DIST_DIR / "lightweight_server"
 
-    if source_dist.exists():
-        shutil.copy2(source_dist, dest_file)
-        print("✅ Lightweight server executable copied successfully!")
-    else:
+    if not source_dist.exists():
         print("❌ Lightweight server executable not found in dist directory")
         print(f"   Expected location: {source_dist}")
         sys.exit(1)
+
+    # Copy to frontend/python-dist directory (for backwards compatibility)
+    print("📁 Copying executable to frontend/python-dist...")
+    if DIST_DIR.exists():
+        shutil.rmtree(DIST_DIR)
+    DIST_DIR.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source_dist, python_dist_file)
+    print(f"✅ Copied to: {python_dist_file}")
+
+    # Copy to src-tauri/bin with platform-specific name (for Tauri sidecar)
+    print("📁 Copying executable to src-tauri/bin for Tauri sidecar...")
+    tauri_bin_dir = FRONTEND_DIR / "src-tauri" / "bin"
+    tauri_bin_dir.mkdir(parents=True, exist_ok=True)
+
+    platform_name = get_tauri_platform_name()
+    if platform_name:
+        if os.name == "nt":
+            tauri_dest_file = tauri_bin_dir / f"lightweight_server-{platform_name}.exe"
+        else:
+            tauri_dest_file = tauri_bin_dir / f"lightweight_server-{platform_name}"
+
+        shutil.copy2(source_dist, tauri_dest_file)
+        # Make sure it's executable on Unix
+        if os.name != "nt":
+            os.chmod(tauri_dest_file, 0o755)
+        print(f"✅ Copied to: {tauri_dest_file}")
+    else:
+        print("⚠️  Skipping Tauri bin copy (unknown platform)")
+
+    print("✅ Lightweight server executable copied successfully!")
 
 
 def main():
@@ -154,7 +196,9 @@ def main():
         build_with_pyinstaller(pyinstaller_exe, venv_path)
 
         print("\n✅ Python backend built successfully with PyInstaller!")
-        print(f"📦 Executable location: {DIST_DIR}")
+        print(f"📦 Executable locations:")
+        print(f"   - python-dist: {DIST_DIR}")
+        print(f"   - src-tauri/bin: {FRONTEND_DIR / 'src-tauri' / 'bin'}")
 
         # Show size information
         if os.name == "nt":
@@ -163,12 +207,9 @@ def main():
             exe_path = DIST_DIR / "lightweight_server"
 
         if exe_path.exists():
-            # Calculate total size
-            total_size = sum(
-                f.stat().st_size for f in exe_path.rglob("*") if f.is_file()
-            )
-            size_mb = total_size / (1024 * 1024)
-            print(f"📊 Total size: {size_mb:.1f} MB")
+            # Get file size (single file, not directory)
+            size_mb = exe_path.stat().st_size / (1024 * 1024)
+            print(f"📊 Executable size: {size_mb:.1f} MB")
 
     except Exception as error:
         print(f"❌ Build failed: {error}")

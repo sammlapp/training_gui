@@ -2094,7 +2094,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
                 currentSettings={settings}
               />
               <HttpServerStatus
-                serverUrl="${backendUrl}"
+                serverUrl={backendUrl}
                 onClearCache={httpLoader.clearCache}
                 onGetStats={httpLoader.getServerStats}
               />

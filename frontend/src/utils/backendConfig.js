@@ -6,7 +6,7 @@ let cachedBackendUrl = null;
 /**
  * Get the backend server URL dynamically
  * For Tauri apps, this calls the Rust backend to get the actual port
- * For Electron/browser, falls back to localhost:8000
+ * For browser mode, falls back to localhost:8000
  */
 export async function getBackendUrl() {
   // Return cached value if available
@@ -36,7 +36,7 @@ export async function getBackendUrl() {
     }
   }
 
-  // For Electron or browser mode, use default port
+  // For browser mode, use default port
   cachedBackendUrl = 'http://localhost:8000';
   return cachedBackendUrl;
 }

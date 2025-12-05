@@ -15,16 +15,9 @@ allow up to N background tasks to run in parallel if user clicks run in parallel
 
 ## known bugs
 
-backend lightweight_server does not terminate on app termination
-
-cannot ctrl/cmd+c/v in the app 
+backend lightweight_server still does not terminate on app termination
 
 When using remote file explorer, "save" dialogue is incorrect - cannot create file
-
-Review tab: 
-When the layout number of columns/rows is changed, the active clip changes. Instead, the page should update so that the previously active clip is still on the displayed page, and is still the active clip. 
-Sometimes the review tab does not render specs on the page (bin) when enabling or changing settings of classifier guided listening (CGL). They only render on page change. We should ensure that any clips displayed in the current page/bin get rendered immediately 
-
 
 Need to test training (failed, fixed bug in script, didn't try again)
 

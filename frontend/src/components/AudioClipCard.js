@@ -81,7 +81,7 @@ function AudioClipCard({
         normalize_audio: true
       };
 
-      // Use HTTP backend (works in both Electron and browser)
+      // Use HTTP backend (works in both Tauri and browser)
       const serverUrl = await getBackendUrl();
 
       // Build query parameters

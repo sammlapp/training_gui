@@ -2,48 +2,25 @@
   "name": "dipper",
   "version": "0.0.6",
   "description": "Cross-platform desktop app for bioacoustics ML training and inference",
-  "main": "src/main-review.js",
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
     "build:server": "cross-env REACT_APP_MODE=server react-scripts build",
+    "build:review": "cross-env REACT_APP_REVIEW_ONLY=true react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "build:python-pyinstaller": "python ../backend/build_pyinstaller.py",
     "build:conda-pack": "python ../backend/build_conda_pack.py",
     "build:all": "npm run build && npm run build:python-pyinstaller",
-    "electron-dev": "concurrently \"cross-env BROWSER=none npm start\" \"wait-on http://localhost:3000 && cross-env NODE_ENV=development electron src/main.js\"",
-    "electron-dev-pyinstaller": "concurrently \"cross-env BROWSER=none npm start\" \"./python-dist/lightweight_server --port 8000\" \"wait-on http://localhost:3000 && wait-on http://localhost:8000/health && cross-env NODE_ENV=development electron src/main.js\"",
-    "start:server": "./python-dist/lightweight_server --port 8000",
-    "electron:build": "npm run build:all && electron-builder",
-    "electron:pack": "npm run build:all && electron-builder --dir",
-    "dist": "npm run build:all && electron-builder",
-    "dist:mac": "npm run build:all && electron-builder --mac",
-    "dist:mac-arm64": "npm run build:all && electron-builder --mac --arm64",
-    "dist:mac-x64": "npm run build:all && electron-builder --mac --x64",
-    "dist:win": "npm run build:all && electron-builder --win",
-    "dist:linux": "npm run build:all && electron-builder --linux",
-    "dist:all": "npm run build:all && electron-builder --mac --win --linux",
-    "build:review": "cross-env REACT_APP_REVIEW_ONLY=true react-scripts build",
     "build:review-all": "npm run build:review && npm run build:python-pyinstaller",
-    "electron-dev-review": "concurrently \"cross-env BROWSER=none REACT_APP_REVIEW_ONLY=true npm start\" \"wait-on http://localhost:3000 && cross-env NODE_ENV=development electron src/main-review.js\"",
-    "electron-dev-review-pyinstaller": "concurrently \"cross-env BROWSER=none REACT_APP_REVIEW_ONLY=true npm start\" \"./python-dist/lightweight_server --port 8000\" \"wait-on http://localhost:3000 && wait-on http://localhost:8000/health && cross-env NODE_ENV=development electron src/main-review.js\"",
-    "dist:review": "npm run build:review-all && node scripts/build-review.js",
-    "dist:review-mac": "npm run build:review-all && node scripts/build-review.js --mac",
-    "dist:review-mac-arm64": "npm run build:review-all && node scripts/build-review.js --mac --arm64",
-    "dist:review-mac-x64": "npm run build:review-all && node scripts/build-review.js --mac --x64",
-    "dist:review-win": "npm run build:review-all && node scripts/build-review.js --win",
-    "dist:review-linux": "npm run build:review-all && node scripts/build-review.js --linux",
-    "dist:review-all": "npm run build:review-all && node scripts/build-review.js --mac --win --linux",
-    "postinstall": "electron-builder install-app-deps",
+    "start:server": "./python-dist/lightweight_server --port 8000",
     "tauri:dev": "tauri dev",
     "tauri:dev:full": "concurrently \"python ../backend/lightweight_server.py --port 8000\" \"wait-on http://localhost:8000/health && tauri dev\"",
     "tauri:dev:review": "cross-env REACT_APP_REVIEW_ONLY=true tauri dev",
     "tauri:dev:review:full": "concurrently \"python ../backend/lightweight_server.py --port 8000\" \"wait-on http://localhost:8000/health && cross-env REACT_APP_REVIEW_ONLY=true tauri dev\"",
     "tauri:build": "npm run build && tauri build",
     "tauri:build:all": "npm run build:all && tauri build",
-    "tauri:build:review": "npm run build:review && tauri build --skip-stapling",
-    "tauri:build:review:notarize": "npm run build:review && tauri build"
+    "tauri:build:review": "npm run build:review && tauri build"
   },
   "dependencies": {
     "@emotion/react": "^11.11.0",
@@ -51,7 +28,6 @@
     "@mui/icons-material": "^5.15.0",
     "@mui/material": "^5.15.0",
     "@tauri-apps/api": "^2.1.1",
-    "electron-is-dev": "^2.0.0",
     "pathe": "^2.0.3",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
@@ -62,119 +38,10 @@
     "@tauri-apps/cli": "^2.9.4",
     "concurrently": "^8.2.0",
     "cross-env": "^7.0.3",
-    "electron": "^28.3.3",
-    "electron-builder": "^24.9.0",
     "wait-on": "^7.0.1"
   },
   "homepage": "./",
   "author": "Bioacoustics Training GUI Team",
-  "build": {
-    "extends": null,
-    "appId": "com.bioacoustics.traininggui",
-    "productName": "Dipper",
-    "directories": {
-      "output": "../dist"
-    },
-    "compression": "store",
-    "npmRebuild": false,
-    "buildDependenciesFromSource": false,
-    "files": [
-      "build/**/*",
-      "src/**/*",
-      "dist-electron/**/*",
-      "assets/**/*",
-      "!assets/*.ai",
-      "node_modules/**/*",
-      "!node_modules/.cache",
-      "!node_modules/**/*.d.ts",
-      "!node_modules/**/*.map"
-    ],
-    "extraResources": [
-      {
-        "from": "../backend",
-        "to": "backend",
-        "filter": [
-          "**/*",
-          "!**/__pycache__/**/*",
-          "!**/*.pyc",
-          "!**/*.pyo",
-          "!**/.DS_Store"
-        ]
-      },
-      {
-        "from": "python-dist",
-        "to": "python-dist",
-        "filter": [
-          "**/*",
-          "!**/__pycache__/**/*",
-          "!**/*.pyc",
-          "!**/*.pyo",
-          "!**/.DS_Store"
-        ]
-      }
-    ],
-    "mac": {
-      "category": "public.app-category.developer-tools",
-      "icon": "assets/dipper.icns",
-      "hardenedRuntime": false,
-      "gatekeeperAssess": false,
-      "target": [
-        {
-          "target": "dmg",
-          "arch": [
-            "arm64",
-            "x64"
-          ]
-        }
-      ]
-    },
-    "win": {
-      "icon": "assets/icon.svg",
-      "target": [
-        {
-          "target": "nsis",
-          "arch": [
-            "x64"
-          ]
-        }
-      ]
-    },
-    "linux": {
-      "category": "Development",
-      "icon": "assets/icon.svg",
-      "target": [
-        {
-          "target": "AppImage",
-          "arch": [
-            "x64"
-          ]
-        }
-      ]
-    },
-    "dmg": {
-      "title": "Dipper",
-      "icon": "assets/dipper.icns",
-      "background": null,
-      "contents": [
-        {
-          "x": 130,
-          "y": 220
-        },
-        {
-          "x": 410,
-          "y": 220,
-          "type": "link",
-          "path": "/Applications"
-        }
-      ]
-    },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true
-    }
-  },
   "browserslist": {
     "production": [
       ">0.2%",

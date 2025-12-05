@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef, memo } from 'react';
 import { basename } from 'pathe';
 import Select from 'react-select';
-// import { useRenderProfiler } from './PerformanceProfiler';
 
 const AnnotationCard = memo(function AnnotationCard({
   clipData,
@@ -304,38 +303,8 @@ const AnnotationCard = memo(function AnnotationCard({
             image_height: 224,
           };
 
-          if (window.electronAPI && file && start_time !== undefined) {
-            const clipEndTime = end_time || start_time + 3;
-
-            // Get current root audio path from localStorage
-            const reviewSettings = localStorage.getItem('review_settings');
-            const currentRootAudioPath = reviewSettings ? JSON.parse(reviewSettings).root_audio_path || '' : '';
-
-            let fullFilePath = file;
-            if (currentRootAudioPath && !file.startsWith('/') && !file.match(/^[A-Za-z]:\\/)) {
-              fullFilePath = `${currentRootAudioPath}/${file}`;
-            }
-
-            console.log('Loading spectrogram for:', fullFilePath, 'from', start_time, 'to', clipEndTime);
-
-            const result = await window.electronAPI.createAudioClips(
-              fullFilePath,
-              start_time,
-              clipEndTime,
-              settings
-            );
-
-            console.log('Spectrogram result:', result);
-
-            if (result.status === 'success' && result.spectrogram_base64) {
-              const dataUrl = `data:image/png;base64,${result.spectrogram_base64}`;
-              setSpectrogramUrl(dataUrl);
-            } else {
-              setError(result.error || 'Failed to generate spectrogram');
-            }
-          } else {
-            setError('Missing file path or Electron API not available');
-          }
+          // Electron API code removed - spectrograms are now passed via props
+          setError('Direct spectrogram loading not supported in this mode');
         } catch (err) {
           setError(`Failed to load spectrogram: ${err.message}`);
         } finally {

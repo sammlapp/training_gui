@@ -16,6 +16,7 @@ import subprocess
 import threading
 import tarfile
 import glob
+import platform
 from pathlib import Path
 from aiohttp import web, web_request
 from aiohttp_cors import setup as cors_setup, ResourceOptions
@@ -33,6 +34,76 @@ logger = logging.getLogger(__name__)
 
 # Google Drive file ID for PyTorch environment
 PYTORCH_ENV_FILE_ID = "1rsJjnCWjkiMDPimwg11QKsI-tOS7To8O"
+
+
+def is_process_alive(pid):
+    """
+    Check if a process with given PID is still running.
+    Cross-platform implementation for Windows, macOS, and Linux.
+
+    Args:
+        pid: Process ID to check
+
+    Returns:
+        True if process is alive, False otherwise
+    """
+    if pid is None or pid <= 0:
+        return False
+
+    system = platform.system()
+
+    try:
+        if system == "Windows":
+            # On Windows, use tasklist command to check if process exists
+            import ctypes
+            kernel32 = ctypes.windll.kernel32
+            PROCESS_QUERY_INFORMATION = 0x0400
+            handle = kernel32.OpenProcess(PROCESS_QUERY_INFORMATION, 0, pid)
+            if handle:
+                kernel32.CloseHandle(handle)
+                return True
+            return False
+        else:
+            # On Unix-like systems (Linux, macOS), use os.kill with signal 0
+            # Signal 0 doesn't actually send a signal, just checks if process exists
+            os.kill(pid, 0)
+            return True
+    except (OSError, AttributeError, Exception):
+        # OSError raised if process doesn't exist
+        # AttributeError if ctypes not available
+        return False
+
+
+async def monitor_parent_process(parent_pid, shutdown_callback, check_interval=2.0):
+    """
+    Async task that monitors the parent process and triggers shutdown if parent dies.
+
+    Args:
+        parent_pid: PID of the parent process to monitor
+        shutdown_callback: Async function to call when parent process dies
+        check_interval: How often to check (in seconds)
+    """
+    logger.info(f"Starting parent process monitor (parent PID: {parent_pid})")
+    logger.info(f"Checking parent process every {check_interval} seconds")
+
+    check_count = 0
+    while True:
+        await asyncio.sleep(check_interval)
+        check_count += 1
+
+        is_alive = is_process_alive(parent_pid)
+        if check_count <= 3:  # Log first few checks for debugging
+            logger.info(f"Parent process check #{check_count}: PID {parent_pid} alive={is_alive}")
+
+        if not is_alive:
+            logger.warning(f"Parent process (PID {parent_pid}) is no longer alive!")
+            logger.info("Initiating graceful shutdown...")
+            try:
+                await shutdown_callback()
+            except Exception as e:
+                logger.error(f"Error during shutdown callback: {e}")
+            logger.info("Shutdown callback completed, exiting monitor")
+            break
 
 
 def get_last_error_from_log(log_file_path, max_lines=10):
@@ -1221,7 +1292,8 @@ class LightweightServer:
         return web.json_response(
             {
                 "status": "ok",
-                "message": "Lightweight server running",
+                "message": f"Lightweight server running on port {self.port}",
+                "port": self.port,
                 "server_type": "lightweight",
                 "capabilities": [
                     "scan_folder",
@@ -2700,6 +2772,7 @@ class LightweightServer:
 def main():
     parser = argparse.ArgumentParser(description="Lightweight bioacoustics server")
     parser.add_argument("--port", type=int, default=8000, help="Port to run on")
+    parser.add_argument("--parent-pid", type=int, default=None, help="Parent process PID for heartbeat monitoring")
     parser.add_argument("--test", action="store_true", help="Run quick test and exit")
 
     args = parser.parse_args()
@@ -2722,16 +2795,59 @@ def main():
         server = LightweightServer(args.port)
         runner = await server.start_server()
 
-        try:
-            # Keep server running
-            while True:
-                await asyncio.sleep(1)
-        except KeyboardInterrupt:
-            logger.info("Shutting down server...")
-            await runner.cleanup()
+        # Get parent process ID for heartbeat monitoring
+        # Use provided parent PID if available, otherwise use getppid()
+        parent_pid = args.parent_pid if args.parent_pid else os.getppid()
+        logger.info(f"Server started with parent process PID: {parent_pid} (provided={args.parent_pid is not None})")
+        logger.info(f"Server process PID: {os.getpid()}")
 
-    asyncio.run(run_server())
-    return 0
+        # Create shutdown event for graceful termination
+        shutdown_event = asyncio.Event()
+
+        async def graceful_shutdown():
+            """Callback for graceful shutdown when parent dies"""
+            logger.info("Graceful shutdown: setting shutdown event")
+            shutdown_event.set()
+            logger.info("Graceful shutdown: cleaning up runner")
+            try:
+                await runner.cleanup()
+                logger.info("Graceful shutdown: runner cleanup completed")
+            except Exception as e:
+                logger.error(f"Error during runner cleanup: {e}")
+
+        # Start parent process monitoring task
+        monitor_task = asyncio.create_task(
+            monitor_parent_process(parent_pid, graceful_shutdown, check_interval=2.0)
+        )
+
+        try:
+            # Keep server running until shutdown event is triggered
+            await shutdown_event.wait()
+            logger.info("Shutdown event received, server stopped")
+            logger.info("Exiting server process...")
+        except KeyboardInterrupt:
+            logger.info("Keyboard interrupt received, shutting down server...")
+            await runner.cleanup()
+        except Exception as e:
+            logger.error(f"Unexpected error in server main loop: {e}")
+            await runner.cleanup()
+        finally:
+            # Cancel monitoring task if still running
+            if not monitor_task.done():
+                monitor_task.cancel()
+                try:
+                    await monitor_task
+                except asyncio.CancelledError:
+                    pass
+
+    try:
+        asyncio.run(run_server())
+    except Exception as e:
+        logger.error(f"Error running server: {e}")
+    finally:
+        logger.info("Server main() function exiting")
+        # Force exit to ensure no lingering tasks
+        sys.exit(0)
 
 
 if __name__ == "__main__":

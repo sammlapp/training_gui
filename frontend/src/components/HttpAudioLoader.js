@@ -336,11 +336,24 @@ export const useHttpAudioLoader = (serverUrl) => {
 export const HttpServerStatus = ({ serverUrl, onClearCache, onGetStats }) => {
   const [serverStatus, setServerStatus] = useState('unknown');
   const [serverStats, setServerStats] = useState(null);
+  const [serverInfo, setServerInfo] = useState(null);
   const { checkServerHealth } = useHttpAudioLoader(serverUrl);
 
   const checkStatus = async () => {
-    const isHealthy = await checkServerHealth();
-    setServerStatus(isHealthy ? 'healthy' : 'unhealthy');
+    try {
+      const response = await fetch(`${serverUrl}/health`);
+      if (!response.ok) {
+        setServerStatus('unhealthy');
+        setServerInfo(null);
+        return;
+      }
+      const data = await response.json();
+      setServerStatus('healthy');
+      setServerInfo(data);
+    } catch (err) {
+      setServerStatus('unhealthy');
+      setServerInfo(null);
+    }
   };
 
   const handleGetStats = async () => {
@@ -353,12 +366,20 @@ export const HttpServerStatus = ({ serverUrl, onClearCache, onGetStats }) => {
   return (
     <div className="http-server-status">
       <div className="server-info">
-        <span className="server-url">🌐 {serverUrl}</span>
+        <span className="server-url">
+          🌐 {serverUrl}
+          {serverInfo && serverInfo.port && ` :${serverInfo.port}`}
+        </span>
         <span className={`server-status ${serverStatus}`}>
-          {serverStatus === 'healthy' ? '✅' : serverStatus === 'unhealthy' ? '❌' : '❓'} 
+          {serverStatus === 'healthy' ? '✅' : serverStatus === 'unhealthy' ? '❌' : '❓'}
           {serverStatus}
         </span>
       </div>
+      {serverInfo && (
+        <div className="server-details">
+          <small>{serverInfo.message || 'Server running'}</small>
+        </div>
+      )}
       <div className="server-controls">
         <button onClick={checkStatus} className="check-button">Check Status</button>
         <button onClick={handleGetStats} className="stats-button">Get Stats</button>
@@ -367,7 +388,7 @@ export const HttpServerStatus = ({ serverUrl, onClearCache, onGetStats }) => {
       {serverStats && (
         <div className="server-stats">
           <small>
-            Cache: {serverStats.cache_size}/{serverStats.cache_max_size} | 
+            Cache: {serverStats.cache_size}/{serverStats.cache_max_size} |
             Threads: {serverStats.executor_threads}
           </small>
         </div>

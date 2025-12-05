@@ -844,14 +844,7 @@ class TaskManager {
         }
       }
 
-      // Fallback to Electron API if available (for compatibility)
-      if (task.systemPid && window.electronAPI) {
-        try {
-          window.electronAPI.killPythonProcess(task.systemPid);
-        } catch (error) {
-          console.error('Error killing process via Electron API:', error);
-        }
-      }
+      // Electron API fallback removed - using backend cancellation only
     }
 
     // Remove from queue

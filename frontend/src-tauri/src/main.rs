@@ -304,10 +304,12 @@ fn start_backend_server(app: &tauri::AppHandle, port: u16) -> Option<tauri_plugi
         }
     };
 
-    println!("  Spawning with args: --port {}", port);
+    // Get current process PID to pass to backend for heartbeat monitoring
+    let parent_pid = std::process::id();
+    println!("  Spawning with args: --port {} --parent-pid {}", port, parent_pid);
 
     match sidecar
-        .args(["--port", &port.to_string()])
+        .args(["--port", &port.to_string(), "--parent-pid", &parent_pid.to_string()])
         .spawn()
     {
         Ok((mut rx, child)) => {
@@ -511,19 +513,23 @@ fn main() {
         })
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {
-                // Kill the backend server when window closes
-                println!("Window close event - cleaning up backend...");
-                let app = window.app_handle();
-                let state: tauri::State<BackendState> = app.state();
-                let mut guard = state.process.lock().unwrap();
-                if let Some(child) = guard.take() {
-                    println!("Killing backend server on window close...");
-                    let _ = child.kill();
-                    println!("✓ Backend server terminated");
+                // Only kill backend when MAIN window closes, not splash or other windows
+                if window.label() == "main" {
+                    println!("Main window close event - cleaning up backend...");
+                    let app = window.app_handle();
+                    let state: tauri::State<BackendState> = app.state();
+                    let mut guard = state.process.lock().unwrap();
+                    if let Some(child) = guard.take() {
+                        println!("Killing backend server on window close...");
+                        let _ = child.kill();
+                        println!("✓ Backend server terminated");
+                    } else {
+                        println!("No backend process to terminate (may be manual mode)");
+                    }
+                    drop(guard);
                 } else {
-                    println!("No backend process to terminate (may be manual mode)");
+                    println!("Window '{}' closed (backend not affected)", window.label());
                 }
-                drop(guard);
             }
         })
         .invoke_handler(tauri::generate_handler![
