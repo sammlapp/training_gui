@@ -33,7 +33,7 @@ cp dist/lightweight_server ../frontend/python-dist/lightweight_server
 All ML scripts are in `backend/scripts/`:
 - `inference.py` - Run model inference
 - `train_model.py` - Train custom models
-- `create_extraction_task.py` - Create annotation tasks
+- `clip_extraction.py` - Create annotation tasks
 - `load_model.py` - Model loading utilities
 - `file_selection.py` - Audio file resolution
 - `config_utils.py` - Configuration handling

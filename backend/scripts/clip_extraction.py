@@ -11,7 +11,7 @@ Creates extraction tasks from ML predictions by:
 6. Optionally extracting audio clips
 
 Usage:
-    python create_extraction_task.py config.json
+    python clip_extraction.py config.json
 """
 
 import argparse
@@ -71,7 +71,7 @@ def scan_predictions_folder(folder_path: str) -> Dict[str, Any]:
     # Find prediction files
     prediction_files = []
     for ext in ["*.csv", "*.pkl"]:
-        prediction_files.extend(list(folder_path.glob(ext)))
+        # prediction_files.extend(list(folder_path.glob(ext)))
         prediction_files.extend(list(folder_path.rglob(ext)))  # Recursive search
 
     if not prediction_files:
@@ -179,7 +179,7 @@ def apply_stratification(
         # df = df.drop(columns=["subfolder"])
         return groups
 
-    return df
+    return {"all_data": df}
 
 
 def apply_filtering(
@@ -715,7 +715,7 @@ def create_extraction_csvs(
     return created_files
 
 
-def create_extraction_task(config_path: str):
+def extract_clips(config_path: str):
     """
     Main function to create extraction task from config file
     """
@@ -808,7 +808,7 @@ def main():
 
     args = parser.parse_args()
 
-    result = create_extraction_task(args.config)
+    result = extract_clips(args.config)
 
     if result["status"] == "error":
         sys.exit(1)

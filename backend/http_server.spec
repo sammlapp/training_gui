@@ -42,7 +42,7 @@ a = Analysis(
         'scan_folder',
         'get_sample_detections',
         'load_scores',
-        'create_extraction_task',
+        'clip_extraction',
     ],
     hookspath=[],
     hooksconfig={},

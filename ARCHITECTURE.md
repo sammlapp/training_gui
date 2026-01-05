@@ -41,7 +41,7 @@ Dipper is a cross-platform bioacoustics machine learning application built with:
        │   ML Task Processes (separate)       │
        │   - inference.py                     │
        │   - train_model.py                   │
-       │   - create_extraction_task.py        │
+       │   - clip_extraction.py        │
        │   (Run in conda environment)         │
        └──────────────────────────────────────┘
 ```
@@ -111,7 +111,7 @@ The application still has Electron IPC infrastructure (preload.js, main.js IPC h
 **ML Task Scripts:** `/backend/scripts/`
 - `inference.py` - Run model inference
 - `train_model.py` - Train custom models
-- `create_extraction_task.py` - Create annotation tasks from detections
+- `clip_extraction.py` - Create annotation tasks from detections
 - `load_model.py` - Model loading utilities
 - `file_selection.py` - Audio file resolution (glob patterns, file lists)
 - `config_utils.py` - Configuration file handling

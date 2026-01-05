@@ -1,8 +1,9 @@
 This project will create a cross-platform desktop app that runs pytorch machine learning models and allows users to train models in an active learning loop. 
 
-## minimal changes:
-allow up to N background tasks to run in parallel if user clicks run in parallel
+## claude start up prompt
+take a close look at this codebase, especially documentation markdowns such as readme.md claude.md build.md. We're going to work from plan.md on ## next steps but first I want you to have a good sense for how the code base works and what is currently implemented. Carefully read the main implementation files: src/App.js, src/AppReviewOnly.js, lightweight_server.py, scripts/train_model.py, scripts/inference.py, scripts/clip_extraction.py
 
+## minimal changes:
 
 # Build and release
 - lightweight python executable for GUI back-end is built with pyinstaller
@@ -23,13 +24,13 @@ Extraction load config is not working
 
 Extraction results in an error, somewhere we get a pd.Series instead of pd.DataFrame
 2025-11-20 22:11:19,733 - ERROR - Traceback (most recent call last):
-  File "/Users/SML161/training_gui/backend/scripts/create_extraction_task.py", line 749, in create_extraction_task
+  File "/Users/SML161/training_gui/backend/scripts/clip_extraction.py", line 749, in clip_extraction
     selected_clips_df = extract_clips_from_groups(groups, config)
                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/Users/SML161/training_gui/backend/scripts/create_extraction_task.py", line 471, in extract_clips_from_groups
+  File "/Users/SML161/training_gui/backend/scripts/clip_extraction.py", line 471, in extract_clips_from_groups
     group_clips.extend(extract_highest_scoring(filtered_df, class_list, config))
                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/Users/SML161/training_gui/backend/scripts/create_extraction_task.py", line 388, in extract_highest_scoring
+  File "/Users/SML161/training_gui/backend/scripts/clip_extraction.py", line 388, in extract_highest_scoring
     if class_name not in group_df.columns:
                          ^^^^^^^^^^^^^^^^
   File "/Users/SML161/Library/Caches/Dipper/envs/dipper_pytorch_env/lib/python3.11/site-packages/pandas/core/generic.py", line 6321, in __getattr__
@@ -42,13 +43,11 @@ Windows shortcuts: ctrl+shift+K doesn't work for next unannotated clip, and ctrl
 
 ## next steps:
 
-Let's prepare to fix up server mode. First, remove outdated markdown documents, review and update
-  README..md, SERVER_AND_TAURI.md, ARCHITECTURE.md. Propose a plan for running in server mode with a
-  configuration file. We should be able to run the app server-side without too much hassle. Something like
-  `dipper --config ~/dipper_server_config.yml` where the config file specifies ports, file access scope for
-  remote user.  
-server configuration and connection; test remote access; fix file save (create file) dialog
+Let's prepare to fix up server mode. Propose a plan for running in server mode with a configuration file. We should be able to run the app server-side without too much hassle. Something like  `dipper --config ~/dipper_server_config.yml` where the config file specifies port, file access scope for remote user, and max concurrent jobs. This takes the place of --port argument. 
 
+server configuration and connection; test remote access; fix file save (create file) dialog: currently does not work at all, not opening a file save dialogue
+
+allow up to N background tasks to run in parallel if user clicks run in parallel
 
 test inference with custom/local models
 
@@ -85,7 +84,6 @@ for clip review from query/explore mode: "add to cart" button on panel, adds the
 
 
 review tab "undo" functionality? I think this would require tracking the full-page or single-clip annotations in a history so that we can sequentially undo and redo changes witch ctrl/cmd+z and ctrl/cmd+y
-
 
 ## Extraction improvements:
 Stratification by folder metadata (eg 'primary period', 'secondary period','site', 'treatment group')

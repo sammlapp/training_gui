@@ -31,7 +31,7 @@ from io import BytesIO
 from scripts import scan_folder
 from scripts import get_sample_detections
 from scripts import load_scores
-from scripts import create_extraction_task
+from scripts import clip_extraction
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -752,9 +752,9 @@ def start_extraction_process(job_id, config_path, env_python_path):
         except Exception as e:
             logger.warning(f"Could not read config data: {e}")
 
-        # Run create_extraction_task.py with the specified Python environment
+        # Run clip_extraction.py with the specified Python environment
         extraction_script = os.path.join(
-            os.path.dirname(__file__), "scripts", "create_extraction_task.py"
+            os.path.dirname(__file__), "scripts", "clip_extraction.py"
         )
         cmd = [env_python_path, extraction_script, config_path]
 
@@ -2186,7 +2186,7 @@ class LightweightServer:
                 )
 
             # Call the scan function from the extraction script
-            result = create_extraction_task.scan_predictions_folder(folder_path)
+            result = clip_extraction.scan_predictions_folder(folder_path)
 
             return web.json_response({"status": "success", **result})
 

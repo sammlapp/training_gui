@@ -312,9 +312,6 @@ def run_classification(model, files, config_data):
                 "status": "success",
                 "files_processed": len(files),
                 "predictions_shape": list(predictions.shape),
-                "species_detected": (
-                    list(predictions.columns) if hasattr(predictions, "columns") else []
-                ),
             }
         )
 
