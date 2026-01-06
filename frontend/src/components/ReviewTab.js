@@ -754,6 +754,64 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
     }
   };
 
+  const handleCloseAnnotationTask = () => {
+    // Confirm if there are unsaved changes
+    if (hasUnsavedChanges) {
+      const confirmClose = window.confirm('You have unsaved changes. Are you sure you want to close this annotation task?');
+      if (!confirmClose) {
+        return;
+      }
+    }
+
+    // Reset all state to initial values
+    setSelectedFile('');
+    setAnnotationData([]);
+    setLoading(false);
+    setError('');
+    setCurrentPage(0);
+    setAvailableClasses([]);
+    setHasUnsavedChanges(false);
+    setLoadedPageData([]);
+    setLastRenderedPage(0);
+    setLastRenderedBinIndex(0);
+    setLastRenderedFocusClipIndex(0);
+    setIsPageTransitioning(false);
+    setRootAudioPath('');
+    setIsFocusMode(false);
+    setFocusClipIndex(0);
+    setActiveClipIndexOnPage(0);
+    setGridModeAutoplay(false);
+    setClassifierGuidedMode({
+      enabled: false,
+      stratificationColumns: [],
+      scoreColumn: null,
+      sortStrategy: 'original',
+      maxClipsPerBin: 20,
+      completionStrategy: 'all',
+      completionTargetCount: 1,
+      completionTargetLabels: []
+    });
+    setStratifiedBins([]);
+    setCurrentBinIndex(0);
+    setFilters({
+      annotation: { enabled: false, values: [] },
+      labels: { enabled: false, values: [] },
+      annotation_status: { enabled: false, values: [] }
+    });
+    setAppliedFilters({
+      annotation: { enabled: false, values: [] },
+      labels: { enabled: false, values: [] },
+      annotation_status: { enabled: false, values: [] }
+    });
+    setCurrentSavePath(null);
+
+    // Reset refs
+    activeClipAudioControlsRef.current = null;
+    previousClipAudioControlsRef.current = null;
+    shouldAutoplayNextClip.current = false;
+    isLayoutChanging.current = false;
+  };
+
   const handleFileInputChange = async (event) => {
     const file = event.target.files[0];
     if (file) {
@@ -2100,13 +2158,22 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
                 </span>
               )}
               {annotationData.length > 0 && (
-                <button
-                  onClick={handleSave}
-                  className="primary-button"
-                  disabled={!hasUnsavedChanges}
-                >
-                  {hasUnsavedChanges ? 'Save Annotations *' : 'Save Annotations'}
-                </button>
+                <>
+                  <button
+                    onClick={handleSave}
+                    className="primary-button"
+                    disabled={!hasUnsavedChanges}
+                  >
+                    {hasUnsavedChanges ? 'Save Annotations *' : 'Save Annotations'}
+                  </button>
+                  <button
+                    onClick={handleCloseAnnotationTask}
+                    className="secondary-button"
+                    title="Close current annotation task and return to landing page"
+                  >
+                    Close Task
+                  </button>
+                </>
               )}
             </div>
 

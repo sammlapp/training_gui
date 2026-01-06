@@ -128,13 +128,10 @@ Something is wrong with the way grid mode is rendering when CGL is enabled. When
 - add Global Settings page with option to switch between remote and desktop versions
 - provide instructions for port forwarding to access the gui on a web browser
 - launch from CLI with argument for HTTP forwarding port
-- Streamlit has some nice backend support for multiple users using the same hosted app, but ours will not. Think carefully about what would happen if multiple users used the app on a multi-user machine. This gets quite a bit more complicated. Probably want to launch a separate instance of the app for each user/session and prevent multiple users from using the same session. 
-- would be huge if task management can be integrated across users; eg what if two people run the app on the same server, should have a central task management system and run jobs sequentially
-
-alternatively, could run backend on remote, run frontend locally, connect to backend via GUI on frontend. This seems more complicated overall because it requires more custom IPC.
 
 ### Training wishlist
-- convert Raven annotations to training data
+(see sketch of full data ingestion tooling)
+- convert Raven annotations to training data 
 - create single-target labels from subfolder structure (wrote this in a python notebook)
 - Weldy style noise augmentation (wrote this in a python notebook)
 - preprocessing "wizard": started notebook for prototype
