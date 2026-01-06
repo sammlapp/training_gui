@@ -3,7 +3,12 @@ import { TASK_STATUS } from '../utils/TaskManager';
 
 function TaskMonitor({ taskManager }) {
   const [tasks, setTasks] = useState([]);
-  const [queueInfo, setQueueInfo] = useState({ currentTask: null, queueLength: 0, nextTasks: [] });
+  const [queueInfo, setQueueInfo] = useState({
+    currentTask: null,
+    runningTasks: [],
+    queueLength: 0,
+    nextTasks: []
+  });
   const [expandedErrors, setExpandedErrors] = useState(new Set());
 
   useEffect(() => {
@@ -88,28 +93,30 @@ function TaskMonitor({ taskManager }) {
 
   return (
     <div className="task-monitor">
-      {/* Queue Status */}
-      {queueInfo.currentTask && (
+      {/* Currently Running Tasks */}
+      {queueInfo.runningTasks && queueInfo.runningTasks.length > 0 && (
         <div className="current-task">
-          <h4>Currently Running</h4>
-          <div className="task-card running">
-            <div className="task-header">
-              <span className="task-name">{queueInfo.currentTask.name}</span>
-              <span className="task-status" style={{ color: getStatusColor(queueInfo.currentTask.status) }}>
-                {queueInfo.currentTask.status}
-              </span>
+          <h4>Currently Running ({queueInfo.runningTasks.length})</h4>
+          {queueInfo.runningTasks.map(task => (
+            <div key={task.id} className="task-card running">
+              <div className="task-header">
+                <span className="task-name">{task.name}</span>
+                <span className="task-status" style={{ color: getStatusColor(task.status) }}>
+                  {task.status}
+                </span>
+              </div>
+              <div className="task-progress">{task.progress}</div>
+              <div className="task-meta">
+                Duration: {formatDuration(task.started)}
+              </div>
+              <button
+                className="task-action cancel"
+                onClick={() => handleCancelTask(task.id)}
+              >
+                Cancel
+              </button>
             </div>
-            <div className="task-progress">{queueInfo.currentTask.progress}</div>
-            <div className="task-meta">
-              Duration: {formatDuration(queueInfo.currentTask.started)}
-            </div>
-            <button
-              className="task-action cancel"
-              onClick={() => handleCancelTask(queueInfo.currentTask.id)}
-            >
-              Cancel
-            </button>
-          </div>
+          ))}
         </div>
       )}
 

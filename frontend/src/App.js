@@ -18,10 +18,12 @@ import ExploreIcon from '@mui/icons-material/Explore';
 import RuleIcon from '@mui/icons-material/Rule';
 import HelpIcon from '@mui/icons-material/Help';
 import ColorizeIcon from '@mui/icons-material/Colorize';
+import SettingsIcon from '@mui/icons-material/Settings';
 import './App.css';
 import ExploreTab from './components/ExploreTab';
 import ReviewTab from './components/ReviewTab';
 import HelpTab from './components/HelpTab';
+import SettingsTab from './components/SettingsTab';
 import TaskCreationForm from './components/TaskCreationForm';
 import TrainingTaskCreationForm from './components/TrainingTaskCreationForm';
 import ExtractionTaskCreationForm from './components/ExtractionTaskCreationForm';
@@ -96,6 +98,7 @@ function App() {
 
   const [activeTab, setActiveTab] = useState(isReviewOnly ? 'review' : 'inference');
   const [currentTask, setCurrentTask] = useState(null);
+  const [runningTasks, setRunningTasks] = useState([]);
   const [taskHistory, setTaskHistory] = useState([]);
   const backendUrl = useBackendUrl();
 
@@ -105,6 +108,7 @@ function App() {
     { id: 'extraction', name: 'Extraction', icon: <ColorizeIcon /> },
     { id: 'explore', name: 'Explore', icon: <ExploreIcon /> },
     { id: 'review', name: 'Review', icon: <RuleIcon /> },
+    { id: 'settings', name: 'Settings', icon: <SettingsIcon /> },
     { id: 'help', name: 'Help', icon: <HelpIcon /> }
   ];
 
@@ -134,8 +138,9 @@ function App() {
       // Always update task history first
       setTaskHistory(taskManager.getAllTasks());
 
-      // Update current task based on queue info
+      // Update running tasks and current task based on queue info
       const queueInfo = taskManager.getQueueInfo();
+      setRunningTasks(queueInfo.runningTasks || []);
       setCurrentTask(queueInfo.currentTask);
     });
 
@@ -149,6 +154,7 @@ function App() {
     // Initial load
     setTaskHistory(taskManager.getAllTasks());
     const queueInfo = taskManager.getQueueInfo();
+    setRunningTasks(queueInfo.runningTasks || []);
     setCurrentTask(queueInfo.currentTask);
 
     // Add tab change listener
@@ -334,6 +340,10 @@ function App() {
           <ReviewTab drawerOpen={isDrawerOpen} />
         )}
 
+        {activeTab === 'settings' && (
+          <SettingsTab />
+        )}
+
         {activeTab === 'help' && (
           <HelpTab />
         )}
@@ -350,11 +360,19 @@ function App() {
             duration: theme.transitions.duration.leavingScreen,
           })
         }}>
-          {currentTask ? (
+          {runningTasks.length > 0 ? (
             <div className="status-running">
               <span className="status-icon">🔄</span>
-              <span>Running: {currentTask.name}</span>
-              <span className="status-progress">{currentTask.progress}</span>
+              {runningTasks.length === 1 ? (
+                <>
+                  <span>Running: {runningTasks[0].name}</span>
+                  <span className="status-progress">{runningTasks[0].progress}</span>
+                </>
+              ) : (
+                <>
+                  <span>Running {runningTasks.length} tasks: {runningTasks.map(t => t.name).join(', ').substring(0, 80)}...</span>
+                </>
+              )}
             </div>
           ) : (
             <div className="status-idle">

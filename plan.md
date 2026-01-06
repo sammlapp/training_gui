@@ -22,24 +22,15 @@ Need to test training (failed, fixed bug in script, didn't try again)
 
 Extraction load config is not working
 
-Extraction results in an error, somewhere we get a pd.Series instead of pd.DataFrame
-2025-11-20 22:11:19,733 - ERROR - Traceback (most recent call last):
-  File "/Users/SML161/training_gui/backend/scripts/clip_extraction.py", line 749, in clip_extraction
-    selected_clips_df = extract_clips_from_groups(groups, config)
-                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/Users/SML161/training_gui/backend/scripts/clip_extraction.py", line 471, in extract_clips_from_groups
-    group_clips.extend(extract_highest_scoring(filtered_df, class_list, config))
-                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/Users/SML161/training_gui/backend/scripts/clip_extraction.py", line 388, in extract_highest_scoring
-    if class_name not in group_df.columns:
-                         ^^^^^^^^^^^^^^^^
-  File "/Users/SML161/Library/Caches/Dipper/envs/dipper_pytorch_env/lib/python3.11/site-packages/pandas/core/generic.py", line 6321, in __getattr__
-    return object.__getattribute__(self, name)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-AttributeError: 'Series' object has no attribute 'columns'
-
 Windows shortcuts: ctrl+shift+K doesn't work for next unannotated clip, and ctrl+s doesn't work for save (applies the No label instead, which should be the S shortcut but not ctrl/cmd + S)
 
+
+Extraction by subfolder: keep entire relative path of subfolder rather than just Path(audio_file).parent.name. That way, folder structures like project/recorder1/wavs/a.wav, project/recorder2/wavs/a.wav are maintained as distinct folders.
+
+## Intuitive workflows from task manager pane
+Completed tasks in task manager should have a button for the next step in the workflow:
+- completed inference task: button for "extract clips" on the completed task panel opens the clip extraction tab and fills in the output folder used by the inference task as the predictions folder in the extraction settings panel 
+- completed extraction task: button on the completed task panel to open the first created task in review tab
 
 ## next steps:
 
@@ -47,34 +38,36 @@ Let's prepare to fix up server mode. Propose a plan for running in server mode w
 
 server configuration and connection; test remote access; fix file save (create file) dialog: currently does not work at all, not opening a file save dialogue
 
-allow up to N background tasks to run in parallel if user clicks run in parallel
-
 test inference with custom/local models
 
 test builds that allow inference and training
 
 get feedback on inference and training builds
 
-add alternative "view mode" for multi-class annotation: instead of a multi-select box, each class has a button that can be toggled for present/absent. Class buttons are floated in a wrapping div, such that multiple can appear side by side if there is enough horizontal space and vertical space is added to the clip panel if needed to display all options. 
+add alternative "view mode" for multi-class annotation: instead of a multi-select box, each class has a button that can be toggled (clicked) for present (green) or absent (no color). Class buttons are floated in a wrapping div, such that multiple can appear side by side if there is enough horizontal space; vertical space is added to the clip panel as needed to display all options. 
 
 - PyInstaller build is likely overly complicated: I think we should be able to use other modules without the "sys.path.append" workarounds to find the modules.  [wip]
 
-- stratification by arbitrary columns in metadata for clip extraction
 
 - delete archive file of pytorch env after unpacking
 - download the correct pytorch .tar.gz conda-pack env based on the operating system
 
 separate HopLite Database-oriented embed, train, and predict into its own app
 
-The splash screen displays on top of all other apps, which is annoying. If user navigates to another application the splash screen should not be displayed on top
+The splash screen during initialization displays on top of all other apps, which is annoying. If user navigates to another application the splash screen should not be displayed on top
 
-Tabs should persist in state when user navigates to another tab and back. Currently, the tab gets completely reset - for instance, if I'm working in the review tab then navigate to another tab and back, it goes back to the landing page. It should retain the full state of the currently displayed clips and display settings while the Dipper main app is running. The same is true for other tabs. 
+Tabs should persist in state when user navigates to another tab and back. Currently, the tab gets completely reset - for instance, if I'm working in the review tab then navigate to another tab and back, it goes back to the landing page. It should retain the full state of the currently displayed clips and display settings while the Dipper main app is running. The same is true for other tabs (should retain the parameters in task configuration panels)
+
+In train/inference, add an option to specify device name for the ML model (typically selects gpu if available, otherwise cpu; advanced users might want to specify a device using torch's conventions, like "cuda:0"). This can be placed in an "advanced settings" sub-panel along with the option to select a custom python environment. 
 
 ## general feature request list 
 
 get xeno-canto / other public recordings for a species to supplement training data?!
 - this functionality is now provided in Jan's package
 - also possible via scripting on BirdSet, though snapshot is early 2024
+
+implement stratification by arbitrary columns in metadata for clip extraction:
+... but how? need mapping from predictions to metadata, then select cols from metadata for stratification; dates/times are a whole different story
 
 denoising and/or bandpassing for audio playback / review
 
@@ -84,6 +77,8 @@ for clip review from query/explore mode: "add to cart" button on panel, adds the
 
 
 review tab "undo" functionality? I think this would require tracking the full-page or single-clip annotations in a history so that we can sequentially undo and redo changes witch ctrl/cmd+z and ctrl/cmd+y
+
+new shortcuts for review tab: 1,2,3...8 to navigate to 1st/etc clip on the current visible page or group; 9 to navigate to the last clip on the page; ctrl+1/2/3/4/5 to change grid mode number of columns;
 
 ## Extraction improvements:
 Stratification by folder metadata (eg 'primary period', 'secondary period','site', 'treatment group')

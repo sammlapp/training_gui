@@ -26,33 +26,9 @@ class TaskManager {
   constructor() {
     this.tasks = new Map();
     this.queue = [];
-    this.runningTasks = new Set();
+    this.currentTask = null;
     this.listeners = new Set();
-    this.loadSettings();
     this.loadTasks();
-
-    window.addEventListener('settingsChanged', (event) => {
-      this.loadSettings();
-      this.processQueue();
-    });
-  }
-
-  loadSettings() {
-    try {
-      const savedSettings = localStorage.getItem('dipper_settings');
-      if (savedSettings) {
-        const settings = JSON.parse(savedSettings);
-        this.maxConcurrentTasks = settings.maxConcurrentTasks ?? 1;
-        this.exemptExtractionTasks = settings.exemptExtractionTasks ?? false;
-      } else {
-        this.maxConcurrentTasks = 1;
-        this.exemptExtractionTasks = false;
-      }
-    } catch (error) {
-      console.error('Failed to load settings:', error);
-      this.maxConcurrentTasks = 1;
-      this.exemptExtractionTasks = false;
-    }
   }
 
   // Task CRUD Operations
@@ -138,22 +114,6 @@ class TaskManager {
     const task = this.getTask(taskId);
     if (!task || task.status === TASK_STATUS.RUNNING) return false;
 
-    // Check if this is an extraction task and exemption is enabled
-    const isExemptedExtraction =
-      this.exemptExtractionTasks &&
-      task.type === TASK_TYPE.EXTRACTION;
-
-    if (isExemptedExtraction) {
-      // Start extraction tasks immediately without queueing
-      this.updateTask(taskId, {
-        status: TASK_STATUS.RUNNING,
-        progress: 'Starting immediately (extraction tasks exempted)...'
-      });
-      this.runningTasks.add(taskId);
-      this.executeTask(taskId);
-      return true;
-    }
-
     // Update task status to queued
     this.updateTask(taskId, {
       status: TASK_STATUS.QUEUED,
@@ -165,39 +125,28 @@ class TaskManager {
       this.queue.push(taskId);
     }
 
-    this.processQueue();
+    // Start immediately if no task is running
+    if (!this.currentTask) {
+      this.processQueue();
+    }
 
     return true;
   }
 
-  getCountedRunningTasks() {
-    if (this.exemptExtractionTasks) {
-      return Array.from(this.runningTasks).filter(taskId => {
-        const task = this.getTask(taskId);
-        return task && task.type !== TASK_TYPE.EXTRACTION;
-      }).length;
-    } else {
-      return this.runningTasks.size;
-    }
-  }
-
   async processQueue() {
-    while (this.queue.length > 0) {
-      const countedRunning = this.getCountedRunningTasks();
-      if (countedRunning >= this.maxConcurrentTasks) {
-        break;
-      }
+    if (this.currentTask || this.queue.length === 0) return;
 
-      const taskId = this.queue.shift();
-      const task = this.getTask(taskId);
+    const taskId = this.queue.shift();
+    const task = this.getTask(taskId);
 
-      if (!task || task.status === TASK_STATUS.CANCELLED) {
-        continue;
-      }
-
-      this.runningTasks.add(taskId);
-      this.executeTask(taskId);
+    if (!task || task.status === TASK_STATUS.CANCELLED) {
+      // Task was deleted or cancelled, process next
+      this.processQueue();
+      return;
     }
+
+    this.currentTask = taskId;
+    await this.executeTask(taskId);
   }
 
   async executeTask(taskId) {
@@ -252,8 +201,7 @@ class TaskManager {
       });
     } finally {
       // Clear current task and process next in queue
-      this.runningTasks.delete(taskId);
-      this.notifyListeners('taskCompleted', { taskId });
+      this.currentTask = null;
       setTimeout(() => this.processQueue(), 100);
     }
   }
@@ -910,8 +858,8 @@ class TaskManager {
     });
 
     // If this was the current task, process next
-    if (this.runningTasks.has(taskId)) {
-      this.runningTasks.delete(taskId);
+    if (this.currentTask === taskId) {
+      this.currentTask = null;
       setTimeout(() => this.processQueue(), 100);
     }
 
@@ -1041,19 +989,14 @@ class TaskManager {
 
   // Queue Info
   getQueueInfo() {
-    const runningTasks = Array.from(this.runningTasks)
-      .map(id => this.getTask(id))
-      .filter(task => task && task.status === TASK_STATUS.RUNNING);
-
-    const currentTask = runningTasks.length > 0 ? runningTasks[0] : null;
+    // Only show currentTask if it's actually still running
+    const currentTask = this.currentTask ? this.getTask(this.currentTask) : null;
+    const isCurrentTaskRunning = currentTask && currentTask.status === TASK_STATUS.RUNNING;
 
     return {
-      currentTask: currentTask,
-      runningTasks: runningTasks,
+      currentTask: isCurrentTaskRunning ? currentTask : null,
       queueLength: this.queue.length,
-      nextTasks: this.queue.slice(0, 3).map(id => this.getTask(id)),
-      maxConcurrentTasks: this.maxConcurrentTasks,
-      exemptExtractionTasks: this.exemptExtractionTasks
+      nextTasks: this.queue.slice(0, 3).map(id => this.getTask(id))
     };
   }
 }
