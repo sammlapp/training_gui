@@ -290,63 +290,58 @@ function App() {
         marginLeft: isDrawerOpen ? 0 : 0, // Remove any margin conflicts
         width: '100%' // Ensure full width
       }}>
-        {activeTab === 'inference' && (
-          <div className="tab-content">
-            <TaskCreationForm
-              onTaskCreate={handleTaskCreate}
-              onTaskCreateAndRun={handleTaskCreateAndRun}
-            />
+        {/* Keep all tabs mounted to preserve state - only hide/show with CSS */}
+        <div className="tab-content" style={{ display: activeTab === 'inference' ? 'block' : 'none' }}>
+          <TaskCreationForm
+            onTaskCreate={handleTaskCreate}
+            onTaskCreateAndRun={handleTaskCreateAndRun}
+          />
 
-            <div className="section">
-              <h3>Task Management</h3>
-              <TaskMonitor taskManager={taskManager} />
-            </div>
+          <div className="section">
+            <h3>Task Management</h3>
+            <TaskMonitor taskManager={taskManager} />
           </div>
-        )}
+        </div>
 
-        {activeTab === 'training' && (
-          <div className="tab-content">
-            <TrainingTaskCreationForm
-              onTaskCreate={handleTaskCreate}
-              onTaskCreateAndRun={handleTaskCreateAndRun}
-            />
+        <div className="tab-content" style={{ display: activeTab === 'training' ? 'block' : 'none' }}>
+          <TrainingTaskCreationForm
+            onTaskCreate={handleTaskCreate}
+            onTaskCreateAndRun={handleTaskCreateAndRun}
+          />
 
-            <div className="section">
-              <h3>Training Task Management</h3>
-              <TaskMonitor taskManager={taskManager} />
-            </div>
+          <div className="section">
+            <h3>Training Task Management</h3>
+            <TaskMonitor taskManager={taskManager} />
           </div>
-        )}
+        </div>
 
-        {activeTab === 'extraction' && (
-          <div className="tab-content">
-            <ExtractionTaskCreationForm
-              onTaskCreate={handleTaskCreate}
-              onTaskCreateAndRun={handleTaskCreateAndRun}
-            />
+        <div className="tab-content" style={{ display: activeTab === 'extraction' ? 'block' : 'none' }}>
+          <ExtractionTaskCreationForm
+            onTaskCreate={handleTaskCreate}
+            onTaskCreateAndRun={handleTaskCreateAndRun}
+          />
 
-            <div className="section">
-              <h3>Extraction Task Management</h3>
-              <TaskMonitor taskManager={taskManager} />
-            </div>
+          <div className="section">
+            <h3>Extraction Task Management</h3>
+            <TaskMonitor taskManager={taskManager} />
           </div>
-        )}
+        </div>
 
-        {activeTab === 'explore' && (
+        <div style={{ display: activeTab === 'explore' ? 'block' : 'none' }}>
           <ExploreTab />
-        )}
+        </div>
 
-        {activeTab === 'review' && (
+        <div style={{ display: activeTab === 'review' ? 'block' : 'none' }}>
           <ReviewTab drawerOpen={isDrawerOpen} />
-        )}
+        </div>
 
-        {activeTab === 'settings' && (
+        <div style={{ display: activeTab === 'settings' ? 'block' : 'none' }}>
           <SettingsTab />
-        )}
+        </div>
 
-        {activeTab === 'help' && (
+        <div style={{ display: activeTab === 'help' ? 'block' : 'none' }}>
           <HelpTab />
-        )}
+        </div>
 
         {/* Fixed status bar */}
         <div className="status-bar" style={{

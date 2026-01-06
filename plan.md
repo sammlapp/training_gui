@@ -56,7 +56,7 @@ separate HopLite Database-oriented embed, train, and predict into its own app
 
 The splash screen during initialization displays on top of all other apps, which is annoying. If user navigates to another application the splash screen should not be displayed on top
 
-Tabs should persist in state when user navigates to another tab and back. Currently, the tab gets completely reset - for instance, if I'm working in the review tab then navigate to another tab and back, it goes back to the landing page. It should retain the full state of the currently displayed clips and display settings while the Dipper main app is running. The same is true for other tabs (should retain the parameters in task configuration panels)
+Tabs should persist in state when user navigates to another tab and back. Currently, the tab gets completely reset - for instance, if I'm working in the review tab then navigate to another tab and back, it goes back to the landing page. It should retain the full state of the currently displayed clips and display settings while the Dipper main app is running. The same is true for other tabs (should retain the parameters/state of the task configuration panels)
 
 In train/inference, add an option to specify device name for the ML model (typically selects gpu if available, otherwise cpu; advanced users might want to specify a device using torch's conventions, like "cuda:0"). This can be placed in an "advanced settings" sub-panel along with the option to select a custom python environment. 
 
@@ -117,10 +117,6 @@ export default function BasicDateRangePicker() {
 
 Something is wrong with the way grid mode is rendering when CGL is enabled. When CGL is off, I can create a grid with 2 columns, but when CGL is on, choosing 2 columns setting creates only 1 column in the displayed grid. 
 
-### ✅ Review-only App
-within this project, create a separate deployable/buildable version of the app that only includes the Review tab. In this version of the app, we can remove page navigation as there will only be one page. We should be able to build this app as a desktop executable that includes the lightweight compiled python environment.
-
-- the offset of main content vs top menu bar isn't working correctly. When the window is narrow the menu bar will wrap around and become larger, causing it to cover the top of the main content. The main content should simply always be below the menu bar. It seems like there should be a simpler way to do this than trying to calculate the expected height of the menu bar, by placing the element below the menu bar instead of behind it. 
 
 ## rewind
 - throughout the application, when providing click-to-play spectrograms, make it so that clicking on the left 20% of the spectrogram rewinds the clip to the beginning instead of performing the play/pause action. Show a rewind icon when hovering over the left 20% of the spectrogram. 
