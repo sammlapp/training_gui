@@ -231,10 +231,9 @@ def get_default_env_archive_path():
 
 def get_default_env_cache_dir():
     """Get the default environment caching folder in system-specific cache directory"""
-    sys.path.insert(0, _get_scripts_path())
-    import appdirs
+    import platformdirs
 
-    return appdirs.user_cache_dir("Dipper", "BioacousticsApp")
+    return platformdirs.user_cache_dir("Dipper", "BioacousticsApp")
 
 
 def download_environment_from_gdrive():
