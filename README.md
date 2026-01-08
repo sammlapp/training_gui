@@ -87,38 +87,58 @@ The application will open in a new desktop window with full functionality.
 
 #### Server Mode
 
-Run on a remote machine and access via web browser from your laptop. Server mode uses two processes:
-- **Python backend** (port 8000) - ML tasks and API
-- **Static file server** (port 3000) - React app
-
-This is useful for:
+Run on a remote machine and access via web browser. Perfect for:
 - Running ML tasks on a remote GPU server
 - Accessing large datasets stored on remote machines
 - Working with audio files located on a server
 - Single-user remote access (no multi-user support)
 
-**On the remote server:**
+**Quick Start:**
+
+1. **Install (one-time setup):**
+   ```bash
+   git clone <repository-url>
+   cd training_gui
+   ./scripts/install-server.sh
+   ```
+
+2. **Configure:**
+   ```bash
+   # Edit server_config.yml to add your audio data directories
+   nano server_config.yml
+   ```
+
+3. **Launch:**
+   ```bash
+   # Starts both Python backend and React server
+   ./scripts/launch-server.sh
+   ```
+
+4. **Access from your laptop:**
+   ```bash
+   # Create SSH tunnel
+   ssh -L 3000:localhost:3000 -L 8000:localhost:8000 user@remote-server
+
+   # Open browser
+   open http://localhost:3000
+   ```
+
+**What's happening:**
+- Python backend (port 8000) - ML tasks and API
+- Static file server (port 3000) - React app
+- Single command manages both processes
+
+**Manual control (advanced):**
 ```bash
-# Terminal 1: Start Python backend (ML/API)
+# Terminal 1: Python backend
 cd backend
+source venv/bin/activate
 python lightweight_server.py --host 0.0.0.0 --port 8000
 
-# Terminal 2: Build and serve React app
+# Terminal 2: Static server
 cd frontend
-REACT_APP_MODE=server npm run build
 npx serve -s build -p 3000
 ```
-
-**On your laptop:**
-```bash
-# Create SSH tunnels for both servers
-ssh -L 3000:localhost:3000 -L 8000:localhost:8000 user@remote-server
-
-# Open browser to access the React app
-open http://localhost:3000
-```
-
-The React app runs in your browser and makes API calls to the Python backend for ML tasks and file operations.
 
 **Note:** Each Dipper instance supports one user at a time. For multiple users, run separate instances on different ports.
 
@@ -128,7 +148,6 @@ The React app runs in your browser and makes API calls to the Python backend for
 ```bash
 cd frontend
 npm run build
-npm run electron-build
 ```
 
 ### Backend
