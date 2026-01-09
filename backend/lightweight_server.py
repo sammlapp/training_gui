@@ -1201,7 +1201,8 @@ class LightweightServer:
     def __init__(self, port=8000, host="localhost"):
         self.port = port
         self.host = host
-        self.app = web.Application()
+        # Increase max request body size to 100MB for large annotation files
+        self.app = web.Application(client_max_size=100 * 1024 * 1024)
         self.running_jobs = (
             {}
         )  # Track running inference jobs: {job_id: {process, task, status, result}}
@@ -1389,7 +1390,9 @@ class LightweightServer:
             data = await request.json()
             csv_path = data.get("csv_path")
             threshold = data.get("threshold", 0)
-            wide_format = data.get("wide_format", False)  # New parameter for multi-hot format
+            wide_format = data.get(
+                "wide_format", False
+            )  # New parameter for multi-hot format
 
             if not csv_path:
                 return web.json_response({"error": "csv_path is required"}, status=400)
@@ -2702,6 +2705,7 @@ class LightweightServer:
 
         except Exception as e:
             import traceback
+
             logger.error(f"Error saving file to {file_path}: {e}")
             logger.error(f"Traceback: {traceback.format_exc()}")
             return web.json_response({"error": str(e)}, status=500)
@@ -2798,7 +2802,12 @@ class LightweightServer:
 
 def main():
     parser = argparse.ArgumentParser(description="Lightweight bioacoustics server")
-    parser.add_argument("--port", type=int, default=8000, help="Port to run on (overridden by config file if provided)")
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=8000,
+        help="Port to run on (overridden by config file if provided)",
+    )
     parser.add_argument(
         "--host",
         type=str,
@@ -2825,7 +2834,7 @@ def main():
     config = {}
     if args.config:
         try:
-            with open(args.config, 'r') as f:
+            with open(args.config, "r") as f:
                 config = yaml.safe_load(f)
             logger.info(f"Loaded config file: {args.config}")
         except Exception as e:
@@ -2837,12 +2846,12 @@ def main():
     port = args.port
 
     if config:
-        if 'server' in config:
-            if 'host' in config['server']:
-                host = config['server']['host']
+        if "server" in config:
+            if "host" in config["server"]:
+                host = config["server"]["host"]
                 logger.info(f"Using host from config file: {host}")
-            if 'port' in config['server']:
-                port = config['server']['port']
+            if "port" in config["server"]:
+                port = config["server"]["port"]
                 logger.info(f"Using port from config file: {port}")
 
     logger.info(f"Server will start on {host}:{port}")
