@@ -17,6 +17,7 @@ import threading
 import tarfile
 import glob
 import platform
+import yaml
 from pathlib import Path
 from aiohttp import web, web_request
 from aiohttp_cors import setup as cors_setup, ResourceOptions
@@ -2689,7 +2690,9 @@ class LightweightServer:
                 )
 
             # Create parent directories if needed
-            os.makedirs(os.path.dirname(normalized_path), exist_ok=True)
+            parent_dir = os.path.dirname(normalized_path)
+            if parent_dir:  # Only create if there's a parent directory
+                os.makedirs(parent_dir, exist_ok=True)
 
             # Write file
             with open(normalized_path, "w", encoding="utf-8") as f:
@@ -2698,7 +2701,9 @@ class LightweightServer:
             return web.json_response({"status": "success", "path": normalized_path})
 
         except Exception as e:
-            logger.error(f"Error saving file: {e}")
+            import traceback
+            logger.error(f"Error saving file to {file_path}: {e}")
+            logger.error(f"Traceback: {traceback.format_exc()}")
             return web.json_response({"error": str(e)}, status=500)
 
     async def read_file_server(self, request):
@@ -2793,12 +2798,18 @@ class LightweightServer:
 
 def main():
     parser = argparse.ArgumentParser(description="Lightweight bioacoustics server")
-    parser.add_argument("--port", type=int, default=8000, help="Port to run on")
+    parser.add_argument("--port", type=int, default=8000, help="Port to run on (overridden by config file if provided)")
     parser.add_argument(
         "--host",
         type=str,
         default="localhost",
-        help="Host to bind to (use 0.0.0.0 for server mode)",
+        help="Host to bind to (use 0.0.0.0 for server mode, overridden by config file if provided)",
+    )
+    parser.add_argument(
+        "--config",
+        type=str,
+        default=None,
+        help="Path to YAML config file (server.host and server.port will override command-line args)",
     )
     parser.add_argument(
         "--parent-pid",
@@ -2809,6 +2820,32 @@ def main():
     parser.add_argument("--test", action="store_true", help="Run quick test and exit")
 
     args = parser.parse_args()
+
+    # Read config file if provided
+    config = {}
+    if args.config:
+        try:
+            with open(args.config, 'r') as f:
+                config = yaml.safe_load(f)
+            logger.info(f"Loaded config file: {args.config}")
+        except Exception as e:
+            logger.error(f"Failed to load config file {args.config}: {e}")
+            sys.exit(1)
+
+    # Use config file values if available, otherwise fall back to command-line args
+    host = args.host
+    port = args.port
+
+    if config:
+        if 'server' in config:
+            if 'host' in config['server']:
+                host = config['server']['host']
+                logger.info(f"Using host from config file: {host}")
+            if 'port' in config['server']:
+                port = config['server']['port']
+                logger.info(f"Using port from config file: {port}")
+
+    logger.info(f"Server will start on {host}:{port}")
 
     if args.test:
         print("✅ Lightweight server test successful!")
@@ -2825,7 +2862,7 @@ def main():
         return 0
 
     async def run_server():
-        server = LightweightServer(port=args.port, host=args.host)
+        server = LightweightServer(port=port, host=host)
         runner = await server.start_server()
 
         # Get parent process ID for heartbeat monitoring
