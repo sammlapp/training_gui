@@ -6,10 +6,7 @@ let cachedBackendUrl = null;
 // Build-time configurable default backend port for SERVER mode.
 // This can be set via REACT_APP_BACKEND_PORT when running `npm run build`.
 // Falls back to 8000 when not provided.
-const CONFIGURED_BACKEND_PORT =
-  (typeof process !== 'undefined' && process.env && process.env.REACT_APP_BACKEND_PORT)
-    ? process.env.REACT_APP_BACKEND_PORT
-    : '8000';
+export const CONFIGURED_BACKEND_PORT = process.env.REACT_APP_BACKEND_PORT
 
 /**
  * Get the backend server URL dynamically

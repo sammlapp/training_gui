@@ -19,7 +19,7 @@ NC='\033[0m' # No Color
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PROJECT_ROOT="$( cd "$SCRIPT_DIR/.." && pwd )"
 
-# Default config file
+# Default config file (allow relative path, then normalize to absolute)
 CONFIG_FILE="${1:-$PROJECT_ROOT/server_config.yml}"
 
 # PID files for cleanup
@@ -54,7 +54,7 @@ echo "║   Dipper Server Mode Launcher         ║"
 echo "╚═══════════════════════════════════════╝"
 echo -e "${NC}"
 
-# Check if config file exists
+# Check if config file exists (from current working directory)
 if [ ! -f "$CONFIG_FILE" ]; then
     echo -e "${RED}✗ Config file not found: $CONFIG_FILE${NC}"
     echo ""
@@ -75,9 +75,12 @@ if [ ! -f "$CONFIG_FILE" ]; then
     exit 1
 fi
 
+# Normalize CONFIG_FILE to an absolute path so Python backend can always read it
+CONFIG_FILE="$(cd "$(dirname "$CONFIG_FILE")" && pwd)/$(basename "$CONFIG_FILE")"
+
 echo -e "${GREEN}✓ Config file: $CONFIG_FILE${NC}"
 
-# Parse config file for host and ports (simple YAML-style parsing)
+# Parse config file for host and ports (for display and frontend only)
 # We intentionally avoid full YAML parsing here and just look for
 # top-level keys "host:", "port:", and "static_port:" under "server:".
 HOST=$(awk 'section=="server" && $1=="host:" {print $2; exit} /^server:/ {section="server"; next} /^[^[:space:]]/ && $1!="server:" {section=""}' "$CONFIG_FILE")
@@ -93,11 +96,17 @@ echo -e "${GREEN}✓ Python backend: http://$HOST:$PYTHON_PORT${NC}"
 echo -e "${GREEN}✓ Static server: http://localhost:$STATIC_PORT${NC}"
 echo ""
 
+# Note: Backend will read host and port from config file directly, but we also
+# pass them explicitly via CLI args so the port/host are honored even if
+# config loading fails in the backend.
+
 # Check if React build exists
 if [ ! -d "$PROJECT_ROOT/frontend/build" ]; then
     echo -e "${YELLOW}! React build not found, building now...${NC}"
     cd "$PROJECT_ROOT/frontend"
-    REACT_APP_MODE=server REACT_APP_BACKEND_PORT=$PYTHON_PORT npm run build
+    # Pass backend port via both REACT_APP_* (for CRA build-time injection)
+    # and DIPPER_BACKEND_PORT (for potential runtime overrides in the browser).
+    REACT_APP_MODE=server REACT_APP_BACKEND_PORT=$PYTHON_PORT DIPPER_BACKEND_PORT=$PYTHON_PORT npm run build
     echo -e "${GREEN}✓ React build complete${NC}"
     echo ""
 fi
@@ -127,11 +136,9 @@ echo ""
 
 # Start Python backend
 echo -e "${YELLOW}[1/2] Starting Python backend...${NC}"
-# cd "$PROJECT_ROOT/backend"
-# $PYTHON_CMD lightweight_server.py --host "$HOST" --port "$PYTHON_PORT" --config "$CONFIG_FILE" > "$PROJECT_ROOT/python-backend.log" 2>&1 &
 # launch pyinstaller executable
 cd "$PROJECT_ROOT/frontend/python-dist/"
-./lightweight_server --host "$HOST" --port "$PYTHON_PORT" --config "$CONFIG_FILE" > "$PROJECT_ROOT/python-backend.log" 2>&1 &
+./lightweight_server --config "$CONFIG_FILE" --host "$HOST" --port "$PYTHON_PORT" > "$PROJECT_ROOT/python-backend.log" 2>&1 &
 PYTHON_PID=$!
 
 # Wait a bit for Python to start

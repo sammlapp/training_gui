@@ -19,7 +19,7 @@ NC='\033[0m' # No Color
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PROJECT_ROOT="$( cd "$SCRIPT_DIR/.." && pwd )"
 
-# Default config file
+# Default config file (allow relative path, then normalize to absolute)
 CONFIG_FILE="${1:-$PROJECT_ROOT/server_config.yml}"
 
 # PID files for cleanup
@@ -54,15 +54,18 @@ echo "║   Dipper Dev Mode (Hot Reload)        ║"
 echo "╚═══════════════════════════════════════╝"
 echo -e "${NC}"
 
-# Check if config file exists
+# Check if config file exists (from current working directory)
 if [ ! -f "$CONFIG_FILE" ]; then
     echo -e "${RED}✗ Config file not found: $CONFIG_FILE${NC}"
     exit 1
 fi
 
+# Normalize CONFIG_FILE to an absolute path so Python backend can always read it
+CONFIG_FILE="$(cd "$(dirname "$CONFIG_FILE")" && pwd)/$(basename "$CONFIG_FILE")"
+
 echo -e "${GREEN}✓ Config file: $CONFIG_FILE${NC}"
 
-# Parse config file for ports
+# Parse config file for ports (for display and frontend only)
 PYTHON_PORT=$(awk 'section=="server" && $1=="port:" {print $2; exit} /^server:/ {section="server"; next} /^[^[:space:]]/ && $1!="server:" {section=""}' "$CONFIG_FILE")
 STATIC_PORT=$(awk 'section=="server" && $1=="static_port:" {print $2; exit} /^server:/ {section="server"; next} /^[^[:space:]]/ && $1!="server:" {section=""}' "$CONFIG_FILE")
 HOST=$(awk 'section=="server" && $1=="host:" {print $2; exit} /^server:/ {section="server"; next} /^[^[:space:]]/ && $1!="server:" {section=""}' "$CONFIG_FILE")
@@ -76,6 +79,10 @@ echo -e "${YELLOW}🔥 HOT RELOAD ENABLED${NC}"
 echo -e "${GREEN}✓ Python backend (source): http://$HOST:$PYTHON_PORT${NC}"
 echo -e "${GREEN}✓ Frontend dev server: http://localhost:$STATIC_PORT${NC}"
 echo ""
+
+# Note: Backend will read host and port from config file directly, but we also
+# pass them explicitly via CLI args so the port/host are honored even if
+# config loading fails in the backend.
 
 # Check if Python backend exists
 if [ ! -f "$PROJECT_ROOT/backend/lightweight_server.py" ]; then
@@ -92,7 +99,7 @@ echo ""
 # Start Python backend from SOURCE
 echo -e "${YELLOW}[1/2] Starting Python backend from source...${NC}"
 cd "$PROJECT_ROOT/backend"
-$PYTHON_CMD lightweight_server.py --host "$HOST" --port "$PYTHON_PORT" > "$PROJECT_ROOT/python-backend-dev.log" 2>&1 &
+$PYTHON_CMD lightweight_server.py --config "$CONFIG_FILE" --host "$HOST" --port "$PYTHON_PORT" > "$PROJECT_ROOT/python-backend-dev.log" 2>&1 &
 PYTHON_PID=$!
 sleep 2
 
@@ -107,7 +114,10 @@ echo -e "${GREEN}  ✓ Python backend started (PID: $PYTHON_PID)${NC}"
 # Start frontend dev server
 echo -e "${YELLOW}[2/2] Starting frontend dev server...${NC}"
 cd "$PROJECT_ROOT/frontend"
-REACT_APP_MODE=server REACT_APP_BACKEND_PORT=$PYTHON_PORT PORT=$STATIC_PORT npm start > "$PROJECT_ROOT/frontend-dev.log" 2>&1 &
+# Pass backend port both as a REACT_APP_* env var (for CRA) and via a
+# runtime global (DIPPER_BACKEND_PORT) that the frontend can read if
+# process.env injection is not working in this environment.
+REACT_APP_MODE=server REACT_APP_BACKEND_PORT=$PYTHON_PORT DIPPER_BACKEND_PORT=$PYTHON_PORT PORT=$STATIC_PORT npm start > "$PROJECT_ROOT/frontend-dev.log" 2>&1 &
 FRONTEND_PID=$!
 sleep 3
 
