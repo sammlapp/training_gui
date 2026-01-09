@@ -107,7 +107,7 @@ echo -e "${GREEN}  ✓ Python backend started (PID: $PYTHON_PID)${NC}"
 # Start frontend dev server
 echo -e "${YELLOW}[2/2] Starting frontend dev server...${NC}"
 cd "$PROJECT_ROOT/frontend"
-REACT_APP_MODE=server PORT=$STATIC_PORT npm start > "$PROJECT_ROOT/frontend-dev.log" 2>&1 &
+REACT_APP_MODE=server REACT_APP_BACKEND_PORT=$PYTHON_PORT PORT=$STATIC_PORT npm start > "$PROJECT_ROOT/frontend-dev.log" 2>&1 &
 FRONTEND_PID=$!
 sleep 3
 

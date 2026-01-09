@@ -97,7 +97,7 @@ echo ""
 if [ ! -d "$PROJECT_ROOT/frontend/build" ]; then
     echo -e "${YELLOW}! React build not found, building now...${NC}"
     cd "$PROJECT_ROOT/frontend"
-    REACT_APP_MODE=server npm run build
+    REACT_APP_MODE=server REACT_APP_BACKEND_PORT=$PYTHON_PORT npm run build
     echo -e "${GREEN}✓ React build complete${NC}"
     echo ""
 fi
@@ -128,10 +128,10 @@ echo ""
 # Start Python backend
 echo -e "${YELLOW}[1/2] Starting Python backend...${NC}"
 # cd "$PROJECT_ROOT/backend"
-# $PYTHON_CMD lightweight_server.py --host "$HOST" --port "$PYTHON_PORT" > "$PROJECT_ROOT/python-backend.log" 2>&1 &
+# $PYTHON_CMD lightweight_server.py --host "$HOST" --port "$PYTHON_PORT" --config "$CONFIG_FILE" > "$PROJECT_ROOT/python-backend.log" 2>&1 &
 # launch pyinstaller executable
 cd "$PROJECT_ROOT/frontend/python-dist/"
-./lightweight_server --host "$HOST" --port "$PYTHON_PORT" > "$PROJECT_ROOT/python-backend.log" 2>&1 &
+./lightweight_server --host "$HOST" --port "$PYTHON_PORT" --config "$CONFIG_FILE" > "$PROJECT_ROOT/python-backend.log" 2>&1 &
 PYTHON_PID=$!
 
 # Wait a bit for Python to start
