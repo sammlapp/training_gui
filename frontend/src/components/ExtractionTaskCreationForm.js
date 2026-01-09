@@ -41,6 +41,7 @@ function ExtractionTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
   const [config, setConfig] = useState(DEFAULT_VALUES.config);
   const [availableClasses, setAvailableClasses] = useState([]);
   const [fileCount, setFileCount] = useState(0);
+  const [isScanningFiles, setIsScanningFiles] = useState(false);
 
   const handlePredictionsFolderSelection = async () => {
     try {
@@ -57,6 +58,10 @@ function ExtractionTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
   };
 
   const scanPredictionsFolder = async (folderPath) => {
+    setIsScanningFiles(true);
+    setAvailableClasses([]);
+    setFileCount(0);
+
     try {
       const backendUrl = await getBackendUrl();
       const response = await fetch(`${backendUrl}/extraction/scan-predictions`, {
@@ -80,6 +85,8 @@ function ExtractionTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
       console.error('Failed to scan predictions folder:', error);
       setAvailableClasses([]);
       setFileCount(0);
+    } finally {
+      setIsScanningFiles(false);
     }
   };
 
@@ -334,7 +341,7 @@ function ExtractionTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
                   {config.predictions_folder}
                 </span>
                 <div className="file-count">
-                  {fileCount} prediction files found, {availableClasses.length} classes available
+                  {isScanningFiles ? 'Scanning for prediction files...' : `${fileCount} prediction files found, ${availableClasses.length} classes available`}
                 </div>
               </div>
             )}

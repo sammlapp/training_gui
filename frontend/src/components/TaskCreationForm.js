@@ -38,6 +38,7 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
   const [globPatterns, setGlobPatterns] = useState(DEFAULT_VALUES.globPatterns);
   const [fileCount, setFileCount] = useState(DEFAULT_VALUES.fileCount);
   const [firstFile, setFirstFile] = useState('');
+  const [isCountingFiles, setIsCountingFiles] = useState(false);
 
   // Available audio extensions with their descriptions
   const availableExtensions = [
@@ -152,6 +153,10 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
   };
 
   const countFilesFromPatterns = async (patterns) => {
+    setIsCountingFiles(true);
+    setFileCount(0);
+    setFirstFile('');
+
     try {
       const backendUrl = await getBackendUrl();
       const response = await fetch(`${backendUrl}/files/count-glob`, {
@@ -180,10 +185,16 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
       setFileCount('? (Server not available)');
       setFirstFile('');
       console.log('Cannot count files - backend server not available. Files will be counted during inference.');
+    } finally {
+      setIsCountingFiles(false);
     }
   };
 
   const countFilesFromList = async (filePath) => {
+    setIsCountingFiles(true);
+    setFileCount(0);
+    setFirstFile('');
+
     try {
       const backendUrl = await getBackendUrl();
       const response = await fetch(`${backendUrl}/files/count-list`, {
@@ -209,6 +220,8 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
       setFileCount('? (Server not available)');
       setFirstFile('');
       console.log('Cannot count files - backend server not available. Files will be counted during inference.');
+    } finally {
+      setIsCountingFiles(false);
     }
   };
 
@@ -544,7 +557,7 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
                 </div>
                 {config.file_globbing_patterns.length > 0 && (
                   <span className="file-count">
-                    Searching in folder - {fileCount} files found
+                    {isCountingFiles ? 'Searching for files...' : `Searching in folder - ${fileCount} files found`}
                   </span>
                 )}
               </div>
@@ -597,7 +610,7 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
                   )}
                   {config.file_globbing_patterns.length > 0 && (
                     <span className="file-count">
-                      {fileCount} files found
+                      {isCountingFiles ? 'Searching for files...' : `${fileCount} files found`}
                     </span>
                   )}
                 </div>
@@ -630,7 +643,7 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
                       {basename(config.file_list)}
                     </span>
                     <span className="file-count">
-                      {fileCount} files listed
+                      {isCountingFiles ? 'Counting files...' : `${fileCount} files listed`}
                     </span>
                   </div>
                 )}
