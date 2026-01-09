@@ -40,7 +40,7 @@ logger = logging.getLogger(__name__)
 
 # Google Drive file IDs for PyTorch environment (OS-specific)
 MACOS_PYTORCH_ENV_FILE_ID = "1rsJjnCWjkiMDPimwg11QKsI-tOS7To8O"
-LINUX_PYTORCH_ENV_FILE_ID = "PLACEHOLDER"  # TODO: Add Linux environment file ID
+LINUX_PYTORCH_ENV_FILE_ID = "1pBt5wTYRCi5U4PjflJEdCS5VDgEZwVMJ"
 WINDOWS_PYTORCH_ENV_FILE_ID = "PLACEHOLDER"  # TODO: Add Windows environment file ID
 
 
@@ -267,7 +267,9 @@ def download_environment_from_gdrive():
             return {"status": "error", "error": error_msg}
 
         archive_path = get_default_env_archive_path()
-        logger.info(f"Downloading PyTorch environment for {os_name} to {archive_path}...")
+        logger.info(
+            f"Downloading PyTorch environment for {os_name} to {archive_path}..."
+        )
         os.makedirs(os.path.dirname(archive_path), exist_ok=True)
 
         # Download using gdown with file ID

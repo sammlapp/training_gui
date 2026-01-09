@@ -28,8 +28,6 @@ https://mui.com/material-ui/react-snackbar/
 
 ## known bugs
 
-if I npm run build:server, I can't run dev mode for local desktop mode. Is this expected? I feel like I should be able to run dev mode for both server and local mode regardless of which version was most recently built. Perhaps some environment variable is being set during build?
-
 Clip extraction: add "annotation" (if single-target) or "labels","annotation_status" (if multi-target) columns to the created csv so that the csv can be opened in the review tab. 
 
 When app reloads, tasks are re-started; background tasks should continue and the app should simply check on their status when reopening. This implies that the task manager should have a cached on-disk record of active tasks.
@@ -48,7 +46,7 @@ When using remote file explorer, "save" dialogue is incorrect - cannot create fi
 
 Windows shortcuts: ctrl+shift+K doesn't work for next unannotated clip, and ctrl+s doesn't work for save (applies the No label instead, which should be the S shortcut but not ctrl/cmd + S)
 
-current numeric form input fields are very bad, hard to type into and hard to use buttons to change values; sometimes typing a new value doesn't correctly replace the old value. Use a simple 
+current numeric form input fields are very bad, hard to type into and hard to use buttons to change values; sometimes typing a new value doesn't correctly replace the old value. Use the Material UI Spinner element for numeric configuration fields, or something equivalently simple and easy to interact with that doesn't add complexity to the codebase.  
 
 Extraction by subfolder: keep entire relative path of subfolder rather than just Path(audio_file).parent.name. That way, folder structures like project/recorder1/wavs/a.wav, project/recorder2/wavs/a.wav are maintained as distinct folders rather than looking like the same folder ("wavs")
 
