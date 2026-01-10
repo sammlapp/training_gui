@@ -244,12 +244,13 @@ def extract_random_clips(
 
         for _, row in sampled.iterrows():
             # Create clip data with individual class scores
-            clip_data = {
+            clip_data = row.copy()
+            clip_data.update({
                 "file": row["file"],
                 "start_time": row["start_time"],
                 "end_time": row["end_time"],
                 "method": "random",
-            }
+            })
 
             # Add individual class scores
             for class_name in class_list:
@@ -277,14 +278,12 @@ def extract_random_clips(
             sampled = class_predictions.sample(n=n_sample, random_state=42)
 
             for _, row in sampled.iterrows():
-                clip_data = {
-                    "file": row["file"],
-                    "start_time": row["start_time"],
-                    "end_time": row["end_time"],
+                clip_data = row.copy()
+                clip_data.update({
                     "class": class_name,
                     "method": "random",
                     "score": row[class_name],
-                }
+                })
 
                 # Add individual class scores
                 for class_name in class_list:
@@ -346,23 +345,16 @@ def extract_score_bin_stratified(
             sampled = bin_predictions.sample(n=n_sample, random_state=42)
 
             for _, row in sampled.iterrows():
-                clip_data = {
-                    "file": row["file"],
-                    "start_time": row["start_time"],
-                    "end_time": row["end_time"],
+                clip_data = row.copy()
+                clip_data.update({
                     "method": f"score_bin_{bin_start}-{bin_end}",
                     "percentile_bin": [bin_start, bin_end],
-                }
+                })
 
                 if extraction_mode == "binary":
                     # For binary mode, keep original format
                     clip_data["class"] = class_name
                     clip_data["score"] = row[class_name]
-                    # clip_data["all_scores"] = (
-                    #     row[class_list].to_dict()
-                    #     if all(c in row for c in class_list)
-                    #     else {}
-                    # )
                 else:
                     # For multiclass mode, store individual class scores directly
                     for class_name_inner in class_list:
@@ -401,12 +393,10 @@ def extract_highest_scoring(
         top_clips = class_predictions.head(n_sample)
 
         for _, row in top_clips.iterrows():
-            clip_data = {
-                "file": row["file"],
-                "start_time": row["start_time"],
-                "end_time": row["end_time"],
+            clip_data = row.copy()
+            clip_data.update({
                 "method": "highest_scoring",
-            }
+            })
 
             if extraction_mode == "binary":
                 # For binary mode, keep original format
@@ -508,7 +498,7 @@ def extract_audio_clips(
     if not config.get("export_audio_clips", False):
         return {}
 
-    clip_duration = config.get("clip_duration", 5.0)
+    clip_duration = config.get("clip_duration")
     save_dir = Path(config["job_folder"])
     clips_dir = save_dir / "clips"
     clips_dir.mkdir(parents=True, exist_ok=True)
@@ -601,7 +591,11 @@ def create_extraction_csvs(
             csv_data = []
             for clip in clips:
                 original_key = f"{clip['file']}_{clip['start_time']}_{clip['end_time']}"
-
+                extracted_clip_info = clip.copy()
+                extracted_clip_info.update({
+                    "annotation": "",  # Empty for user to fill
+                })
+                
                 if (
                     config.get("export_audio_clips", False)
                     and original_key in audio_clip_mapping
@@ -611,30 +605,31 @@ def create_extraction_csvs(
                     # adjust start times to be relative to the _extracted_ clip
                     # rather than relative to the original full audio file
                     detection_center = (clip["start_time"] + clip["end_time"]) / 2
-                    clip_duration = config.get("clip_duration", 5.0)
+                    clip_duration = config.get("clip_duration")
                     clip_start = clip_duration / 2 - (
                         detection_center - clip["start_time"]
                     )
                     clip_end = clip_duration / 2 + (clip["end_time"] - detection_center)
                     clip_start = max(0, clip_start)
                     clip_end = min(clip_duration, clip_end)
+
+                    # clip file, start_time, end_time, file now refer to extracted clip
+                    # retain original file and times in separate columns for user reference
+                    extracted_clip_info.update(
+                        {
+                            "file": file_path,
+                            "start_time": clip_start,
+                            "end_time": clip_end,
+                            "original_file": clip["file"],
+                            "original_start_time": clip["start_time"],
+                            "original_end_time": clip["end_time"],
+                        }
+                    )
                 else:
                     # Use original file path and times
                     # start and end refer to the clip's offset from full audio file
-                    file_path = clip["file"]
-                    clip_start = clip["start_time"]
-                    clip_end = clip["end_time"]
-
-                # keep all info from clip, updating file and times
-                extracted_clip_info = clip.copy()
-                extracted_clip_info.update(
-                    {
-                        "file": file_path,
-                        "start_time": clip_start,
-                        "end_time": clip_end,
-                        "annotation": "",  # Empty for user to fill
-                    }
-                )
+                    pass
+                    
 
                 # Add subfolder column if stratification by subfolder is enabled
                 if config.get("stratification", {}).get("by_subfolder", False):
@@ -673,32 +668,42 @@ def create_extraction_csvs(
         all_classes = config["class_list"]
 
         for original_key, clip in unique_clips.items():
+            row = clip.copy()
+            row.update({
+                "labels": "",  # Empty for user to fill
+                "annotation_status": "",  # Empty for user to fill
+            })
+            
             if (
                 config.get("export_audio_clips", False)
                 and original_key in audio_clip_mapping
             ):
+                
                 # Use extracted clip path and adjust times
                 file_path = f"clips/{audio_clip_mapping[original_key]}"
                 detection_center = (clip["start_time"] + clip["end_time"]) / 2
-                clip_duration = config.get("clip_duration", 5.0)
+                clip_duration = config.get("clip_duration")
                 clip_start = clip_duration / 2 - (detection_center - clip["start_time"])
                 clip_end = clip_duration / 2 + (clip["end_time"] - detection_center)
 
                 clip_start = max(0, clip_start)
                 clip_end = min(clip_duration, clip_end)
-            else:
-                file_path = clip["file"]
-                clip_start = clip["start_time"]
-                clip_end = clip["end_time"]
 
-            # Create row with basic columns
-            row = {
-                "file": file_path,
-                "start_time": clip_start,
-                "end_time": clip_end,
-                "labels": "",
-                "annotation_status": "",
-            }
+                # Create row retaining all info from clip
+                row.update(
+                    {
+                        "file": file_path,
+                        "start_time": clip_start,
+                        "end_time": clip_end,
+                        "original_file": clip["file"],
+                        "original_start_time": clip["start_time"],
+                        "original_end_time": clip["end_time"],
+                    }
+                )
+            else:
+                # Use original file path and times
+                pass
+
 
             # Add subfolder column if stratification by subfolder is enabled
             if config.get("stratification", {}).get("by_subfolder", False):

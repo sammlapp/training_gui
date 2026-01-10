@@ -10,21 +10,20 @@ server:
   host: 0.0.0.0
 
   # Port for Python backend (pyinstaller executable generating spectrograms/audio)
-  port: 8001
+  port: 8005
 
   # Port for static file server (React app)
-  static_port: 3001
+  static_port: 3005
 
 file_access:
   # List of base directories that the app can access
   # Add your audio data directories here
   allowed_base_paths:
-    - /Users/SML161/
+    - /home
+    - /media
 
 jobs:
   # Maximum number of concurrent ML tasks (inference, training, extraction)
-  # Adjust based on your server's RAM and CPU
-  # Each task typically uses 2-4GB RAM
   max_concurrent: 1
 
 logging:
